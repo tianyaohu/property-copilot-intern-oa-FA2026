@@ -66,11 +66,9 @@ export function parseBoundingBox(query: Record<string, string | undefined>): Bou
   const maxLat = Number(parts[2]);
   const maxLng = Number(parts[3]);
 
-  if (minLat > maxLat || minLng > maxLng) return null;
-
   if (![minLat, minLng, maxLat, maxLng].every(Number.isFinite)) return null;
   if (minLat < -90 || maxLat > 90 || minLng < -180 || maxLng > 180) return null;
   if (minLat > maxLat || minLng > maxLng) return null;
 
-  return{ minLat, minLng, maxLat, maxLng};
+  return { minLat, minLng, maxLat, maxLng };
 }
