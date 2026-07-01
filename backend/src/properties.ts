@@ -1,6 +1,6 @@
-import { GetCommand, PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand, QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { GEO_INDEX, TABLE_NAME, getDocClient } from "./db";
-import { encodeGeohash, geohashPrefix, type BoundingBox } from "./geo";
+import { boundingBoxPrefixes, encodeGeohash, geohashPrefix, isInBoundingBox, type BoundingBox } from "./geo";
 import type { Property } from "./types";
 
 /** Compute the geo index attributes for an item from its coordinates. */
@@ -25,6 +25,15 @@ export async function getPropertyById(id: string): Promise<Property | null> {
   );
   return (result.Item as Property | undefined) ?? null;
 }
+
+export function refineToBox(items: Property[], box: BoundingBox): Property[] {
+  return items.filter((item) => isInBoundingBox(item.lat, item.lng, box));
+}
+
+export function dedupeById(items: Property[]): Property[] {
+  return Array.from(new Map(items.map((item) => [item.id, item])).values());
+}
+
 
 /**
  * BASELINE: returns every property by scanning the whole table.
@@ -53,17 +62,30 @@ export async function listAllProperties(): Promise<Property[]> {
   return items;
 }
 
+/** Query one geo-index partition (a single geohash-prefix cell). MVP: no pagination. */
+async function queryPrefix(prefix: string): Promise<Property[]> {
+  const result = await getDocClient().send(
+    new QueryCommand({
+      TableName: TABLE_NAME,
+      IndexName: GEO_INDEX,
+      KeyConditionExpression: "geohashPrefix = :p",
+      ExpressionAttributeValues: { ":p": prefix }
+    })
+  );
+  return (result.Items as Property[] | undefined) ?? [];
+}
+
 /**
- * TODO (candidate): implement a geospatial viewport query.
+ * Geospatial viewport query. Turns the box into the geohash prefixes that cover
+ * it, Queries those geo-index partitions in parallel, then trims the prefix-cell
+ * overhang back to the exact box. Renter filters (rent/beds/type) are composed by
+ * the caller (router) so this and listAllProperties share one filter step.
  *
- * Outline:
- *   1. `boundingBoxPrefixes(box)` (geo.ts) -> the geohash prefixes covering the box.
- *   2. For each prefix, Query the `geo-index` GSI (partition key = geohashPrefix).
- *   3. Discard items whose lat/lng falls outside the exact box (`isInBoundingBox`).
- *
- * This avoids scanning the whole table and is what the map viewport should call.
+ * MVP: no fan-out guard / result cap / per-prefix pagination yet — see the plan's
+ * hardening list.
  */
-export async function queryByBoundingBox(_box: BoundingBox): Promise<Property[]> {
-  void GEO_INDEX; // available for your Query: IndexName: GEO_INDEX
-  throw new Error("queryByBoundingBox is not implemented yet — see Backend & Data Design.");
+export async function queryByBoundingBox(box: BoundingBox): Promise<Property[]> {
+  const prefixes = boundingBoxPrefixes(box);
+  const perPrefix = await Promise.all(prefixes.map(queryPrefix));
+  return refineToBox(dedupeById(perPrefix.flat()), box);
 }
