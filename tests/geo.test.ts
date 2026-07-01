@@ -1,12 +1,15 @@
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, it } from "vitest";
 import {
   GEOHASH_PREFIX_LENGTH,
   boundingBoxPrefixes,
   encodeGeohash,
   geohashPrefix,
   isInBoundingBox,
+  parseBoundingBox,
   type BoundingBox
 } from "../backend/src/geo";
+import { dedupeById, refineToBox } from "../backend/src/properties";
+import type { Property } from "../backend/src/types";
 
 // A box covering roughly downtown Vancouver.
 const VANCOUVER_BOX: BoundingBox = {
@@ -44,5 +47,97 @@ describe("geo", () => {
   test("isInBoundingBox respects edges", () => {
     expect(isInBoundingBox(49.28, -123.12, VANCOUVER_BOX)).toBe(true);
     expect(isInBoundingBox(49.19, -122.85, VANCOUVER_BOX)).toBe(false);
+  });
+});
+
+describe('parseBoundingBox', () => {
+  it('parses valid bbox', () => {
+    expect(parseBoundingBox({ bbox: '0,0,1,1' })).toEqual({
+      minLat: 0, minLng: 0, maxLat: 1, maxLng: 1,
+    });
+  });
+
+  it('returns null when bbox is missing', () => {
+    expect(parseBoundingBox({})).toBeNull();
+  });
+
+  it('returns null when values are not numbers', () => {
+  expect(parseBoundingBox({ bbox: 'a,b,c,d' })).toBeNull();
+  });
+
+  it('returns null when arity is wrong', () => {
+    expect(parseBoundingBox({ bbox: '1,2,3' })).toBeNull();
+  });
+
+  it('returns null when values are out of range', () => {
+    expect(parseBoundingBox({ bbox: '-91,0,0,10' })).toBeNull();
+  });
+
+  it('returns null when bounds are inverted', () => {
+    expect(parseBoundingBox({ bbox: '10,0,0,10' })).toBeNull();
+  });
+  
+});
+
+describe("property helpers", () => {
+  const baseProperty = {
+    id: "listing-1",
+    title: "Test listing",
+    description: "",
+    rent: 2000,
+    bedrooms: 1,
+    bathrooms: 1,
+    propertyType: "apartment",
+    squareFeet: 500,
+    street: "123 Main St",
+    city: "Vancouver",
+    province: "BC",
+    postalCode: "V6B 1A1",
+    geohash: "abc1234",
+    geohashPrefix: "abc12",
+    lat: 49.28,
+    lng: -123.12,
+    images: [],
+    createdAt: "2026-01-01T00:00:00.000Z",
+  } satisfies Property;
+
+  test("refineToBox keeps only points inside the exact box", () => {
+    const items: Property[] = [
+      {
+        ...baseProperty,
+        id: "inside",
+        lat: 49.28,
+        lng: -123.12,
+      },
+      {
+        ...baseProperty,
+        id: "outside",
+        lat: 49.19,
+        lng: -122.85,
+      },
+    ];
+
+    expect(refineToBox(items, VANCOUVER_BOX).map((item) => item.id)).toEqual(["inside"]);
+  });
+
+  test("dedupeById collapses duplicate ids", () => {
+    const items: Property[] = [
+      {
+        ...baseProperty,
+        lat: 49.28,
+        lng: -123.12,
+      },
+      {
+        ...baseProperty,
+        title: "Replacement listing",
+        lat: 49.29,
+        lng: -123.11,
+      },
+    ];
+
+    const deduped = dedupeById(items);
+
+    expect(deduped).toHaveLength(1);
+    expect(deduped[0]).toMatchObject({ title: "Replacement listing", lat: 49.29, lng: -123.11 });
   });
 });
