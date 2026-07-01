@@ -53,3 +53,24 @@ export function boundingBoxPrefixes(box: BoundingBox): string[] {
 export function isInBoundingBox(lat: number, lng: number, box: BoundingBox): boolean {
   return lat >= box.minLat && lat <= box.maxLat && lng >= box.minLng && lng <= box.maxLng;
 }
+
+export function parseBoundingBox(query: Record<string, string | undefined>): BoundingBox | null {
+  const raw = query.bbox;
+  if (!raw) return null;
+
+  const parts = raw.split(",");
+  if (parts.length !== 4) return null;
+
+  const minLat = Number(parts[0]);
+  const minLng = Number(parts[1]);
+  const maxLat = Number(parts[2]);
+  const maxLng = Number(parts[3]);
+
+  if (minLat > maxLat || minLng > maxLng) return null;
+
+  if (![minLat, minLng, maxLat, maxLng].every(Number.isFinite)) return null;
+  if (minLat < -90 || maxLat > 90 || minLng < -180 || maxLng > 180) return null;
+  if (minLat > maxLat || minLng > maxLng) return null;
+
+  return{ minLat, minLng, maxLat, maxLng};
+}
