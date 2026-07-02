@@ -1,6 +1,9 @@
+"use client";
+
+import dynamic from "next/dynamic";
 import type { Property } from "@/lib/types";
 
-type MapPanelProps = {
+export type MapPanelProps = {
   properties: Property[];
   activeId?: string | null;
   onSelect?: (id: string) => void;
@@ -18,20 +21,22 @@ type MapPanelProps = {
  *   - ideally drives a server-side viewport query as the map pans/zooms.
  *
  * The props you need are already threaded through from the browse page.
+ *
+ * Implemented with Leaflet + OpenStreetMap via react-leaflet (see MapInner).
+ * Leaflet touches `window` at import time, so the real map must never render
+ * on the server: next/dynamic with `ssr: false` loads it in the browser only.
+ * That option is disallowed in Server Components, which is why this thin
+ * client-component wrapper exists at all.
  */
-export function MapPanel({ properties, activeId }: MapPanelProps) {
-  return (
-    <div className="flex h-full min-h-[300px] w-full items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-center">
-      <div className="space-y-1">
-        <p className="font-medium text-gray-700">Map goes here</p>
-        <p className="text-sm text-gray-500">
-          {properties.length} listing{properties.length === 1 ? "" : "s"} to plot
-          {activeId ? ` · selected ${activeId}` : ""}
-        </p>
-        <p className="text-xs text-gray-400">
-          Render markers from each property&apos;s lat/lng. See components/MapPanel.tsx.
-        </p>
-      </div>
+const MapInner = dynamic(() => import("./MapInner").then((mod) => mod.MapInner), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[420px] w-full items-center justify-center rounded-lg border border-gray-200 bg-gray-50 lg:h-full">
+      <p className="text-sm text-gray-500">Loading map…</p>
     </div>
-  );
+  )
+});
+
+export function MapPanel(props: MapPanelProps) {
+  return <MapInner {...props} />;
 }

@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useRef } from "react";
 import type { Property } from "@/lib/types";
 
 const CAD = new Intl.NumberFormat("en-CA", {
@@ -22,8 +25,19 @@ type PropertyCardProps = {
  * the list and any detail view rather than duplicating markup.
  */
 export function PropertyCard({ property, active, onSelect }: PropertyCardProps) {
+  const ref = useRef<HTMLElement>(null);
+
+  // Map → list sync: when this card becomes active (its marker was clicked),
+  // bring it into view. "nearest" makes it a no-op if already visible.
+  useEffect(() => {
+    if (active) {
+      ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [active]);
+
   return (
     <article
+      ref={ref}
       className={`overflow-hidden rounded-lg border bg-white transition ${
         active ? "border-black ring-1 ring-black" : "border-gray-200"
       } ${onSelect ? "cursor-pointer hover:border-gray-400" : ""}`}
