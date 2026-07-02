@@ -20,6 +20,9 @@ export function filterProperties(properties: Property[], filter: PropertyFilter)
     if (filter.bedrooms !== undefined && property.bedrooms < filter.bedrooms) {
       return false;
     }
+    if (filter.bathrooms !== undefined && property.bathrooms < filter.bathrooms) {
+      return false;
+    }
     if (filter.propertyType !== undefined && property.propertyType !== filter.propertyType) {
       return false;
     }
@@ -44,6 +47,11 @@ export function parseFilter(query: Record<string, string | undefined>): Property
   const bedrooms = Number(query.bedrooms);
   if (query.bedrooms !== undefined && Number.isFinite(bedrooms)) {
     filter.bedrooms = bedrooms;
+  }
+
+  const bathrooms = Number(query.bathrooms);
+  if (query.bathrooms !== undefined && Number.isFinite(bathrooms)) {
+    filter.bathrooms = bathrooms;
   }
 
   if (

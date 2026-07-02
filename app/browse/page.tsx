@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { fetchProperties } from "@/lib/api";
-import type { Property } from "@/lib/types";
+import type { Property, PropertyFilter } from "@/lib/types";
+import { FilterBar } from "@/components/FilterBar";
 import { PropertyCard } from "@/components/PropertyCard";
 import { MapPanel } from "@/components/MapPanel";
 
@@ -22,6 +23,8 @@ export default function BrowsePage() {
   // must render regardless of load state (it produces the query, not just
   // displays its result).
   const [bbox, setBbox] = useState<string | null>(null);
+  // Active renter filters; composed with the viewport into one server query.
+  const [filter, setFilter] = useState<PropertyFilter>({});
   // Refetches (pan/zoom) keep the previous list on screen; this drives a small
   // "Updating…" hint instead of the full-page loading state.
   const [isFetching, setIsFetching] = useState(false);
@@ -32,15 +35,16 @@ export default function BrowsePage() {
 
     // TODO (candidate): pass the active filters and map viewport here so the
     // server returns only what is relevant, instead of every listing.
-    // (Viewport done — the map's live bounds drive every query; filters land
-    // with the filter bar.)
+    // (Done: the map's live bounds and the filter bar's state compose into one
+    // server query. Typing in a filter input resets the same debounce timer,
+    // so rapid changes coalesce into a single request.)
     const timer = window.setTimeout(() => {
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
       setIsFetching(true);
 
-      fetchProperties({}, { bbox, signal: controller.signal })
+      fetchProperties(filter, { bbox, signal: controller.signal })
         .then((data) => {
           setProperties(data);
           setState("ready");
@@ -68,7 +72,7 @@ export default function BrowsePage() {
       window.clearTimeout(timer);
       abortRef.current?.abort();
     };
-  }, [bbox]);
+  }, [bbox, filter]);
 
   // A refetch can pull the selected listing out of view; drop the selection
   // rather than point at a card that no longer exists.
@@ -91,7 +95,10 @@ export default function BrowsePage() {
         TODO (candidate): a filter bar goes here (rent range, bedrooms, property
         type, + one more dimension). Filters should update both the list and the
         map, compose correctly, and be easy to reset.
+        (Done: rent range, bedrooms, bathrooms — the extra dimension — and
+        property type; active-filter chips with per-chip clear and Reset all.)
       */}
+      <FilterBar filter={filter} onChange={setFilter} />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
         <div className="space-y-3">

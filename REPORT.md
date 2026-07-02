@@ -11,6 +11,9 @@ Address each of the four ambiguous areas (one to three sentences each):
    - *Draft:* `bbox` is required (400 when missing or malformed), so the GSI is the only read path and request cost is proportional to the viewport. Rejected alternative: defaulting to a metro-wide box (~120-prefix fan-out per request for no user benefit).
    - *Draft:* Verified end-to-end by integration tests against DynamoDB Local (also in CI via a service container), including a fixture that only the exact-box refine excludes. Baseline before: full-table Scan, 50 rows in ~27 ms locally.
 4. **Filtering model** — the dimensions you support, how filters compose, and the empty/reset behaviour.
+   - *Draft:* Five dimensions — rent range (inclusive), minimum bedrooms, minimum bathrooms (the extra dimension), property type — all parsed and applied server-side by the same pure `filter.ts` used everywhere; they AND together after the geospatial query, so one request answers viewport + filters and the map and list can never disagree.
+   - *Draft:* Filtering happens in app code post-refine rather than a DynamoDB `FilterExpression`: Query pricing is per item read, not returned, so pushing predicates down saves only network transfer on a candidate set that is already viewport-sized — while app-side keeps the logic pure, shared, and unit-testable.
+   - *Draft:* Active filters render as chips (per-chip clear) with a Reset-all; empty results keep the map interactive and show the empty state in the list; typing shares the viewport debounce, so rapid changes coalesce into one request.
 
 ## What I'd add with more time
 
