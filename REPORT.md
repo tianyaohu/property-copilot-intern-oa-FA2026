@@ -3,6 +3,8 @@
 Address each of the four ambiguous areas (one to three sentences each):
 
 1. **Map provider** — which provider you chose and the trade-off versus the alternatives.
+   - *Draft:* Leaflet + OpenStreetMap via react-leaflet@5: no API key or billing account (Google/Mapbox both need one, with domain-restriction setup for the deployed URL), mature docs, and DOM markers are more than enough at this density. Trade-off vs MapLibre GL: WebGL vector tiles pan smoother at thousands of markers, but cost a ~3× larger bundle and a tile-source decision — unjustified at 50 listings.
+   - *Draft:* Markers are `L.divIcon` price pills rather than the default pin: sidesteps Leaflet's classic bundler-broken default-icon PNGs and shows rent at a glance; icons cached per (rent, active) so re-renders don't churn the DOM.
 2. **Performance at density** — how you keep the map smooth with all markers visible (clustering, viewport rendering, etc.) and what you observed.
 3. **Geospatial querying** — how the server answers a viewport query without scanning the table, and how you use the geohash index.
    - *Draft:* Viewport box → `ngeohash.bboxes` at prefix length 5 (~4.9 km cells) → one `geo-index` Query per prefix in parallel → dedupe → exact lat/lng refine (prefix cells overhang the box) → attribute filters compose after, reusing the pure `filter.ts` logic.
