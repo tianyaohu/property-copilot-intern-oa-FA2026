@@ -1,5 +1,6 @@
 import { filterProperties, parseFilter } from "./filter";
-import { getPropertyById, listAllProperties } from "./properties";
+import { parseBoundingBox } from "./geo";
+import { getPropertyById, queryByBoundingBox } from "./properties";
 
 export type ApiRequest = {
   method: string;
@@ -42,9 +43,27 @@ export async function route(req: ApiRequest): Promise<ApiResponse> {
   // returns the result. There is no viewport/bounding-box support yet — add it
   // here (read `bbox` from the query, call your geospatial query) so the map
   // does not request every listing on the planet.
+  //
+  // Implemented: `bbox` (minLat,minLng,maxLat,maxLng) is required — the
+  // geo-index GSI is the only read path, so a request's cost is proportional
+  // to its viewport and there is no scan-the-world fallback. Attribute filters
+  // compose after the geospatial query, reusing the pure logic in filter.ts.
   if (req.path === "/properties") {
-    const all = await listAllProperties();
-    const properties = filterProperties(all, parseFilter(req.query));
+    if (req.query.bbox === undefined) {
+      return {
+        statusCode: 400,
+        body: { error: "bbox is required (bbox=minLat,minLng,maxLat,maxLng)" }
+      };
+    }
+    const box = parseBoundingBox(req.query);
+    if (!box) {
+      return {
+        statusCode: 400,
+        body: { error: "Invalid bbox (expected bbox=minLat,minLng,maxLat,maxLng)" }
+      };
+    }
+    const inView = await queryByBoundingBox(box);
+    const properties = filterProperties(inView, parseFilter(req.query));
     return { statusCode: 200, body: { properties, count: properties.length } };
   }
 

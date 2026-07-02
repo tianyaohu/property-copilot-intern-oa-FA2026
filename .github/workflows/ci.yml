@@ -10,6 +10,12 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      dynamodb-local:
+        image: amazon/dynamodb-local
+        ports:
+          - 8000:8000
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,11 +29,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Unit tests (geo math, filters, seed data) are pure and need no database.
-      # Tests that exercise DynamoDB directly should run against DynamoDB Local
-      # (e.g. an `amazon/dynamodb-local` service container) if you add them.
+      # Unit tests (geo math, filters, seed data) are pure. The integration
+      # tests (tests/properties.integration.test.ts) exercise the geo-index
+      # query path against the dynamodb-local service container above; they
+      # skip themselves when DYNAMODB_ENDPOINT is unset.
       - name: Test
         run: npm test
+        env:
+          DYNAMODB_ENDPOINT: http://localhost:8000
 
       - name: Build
         run: npm run build

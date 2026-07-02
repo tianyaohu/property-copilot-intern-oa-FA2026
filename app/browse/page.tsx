@@ -8,6 +8,10 @@ import { MapPanel } from "@/components/MapPanel";
 
 type LoadState = "loading" | "error" | "ready";
 
+// Metro Vancouver viewport (minLat,minLng,maxLat,maxLng). Placeholder until the
+// map reports its live bounds; the API requires a bbox on every request.
+const METRO_VANCOUVER_BBOX = "49.0,-123.35,49.45,-122.6";
+
 export default function BrowsePage() {
   const [properties, setProperties] = useState<Property[]>([]);
   const [state, setState] = useState<LoadState>("loading");
@@ -22,7 +26,9 @@ export default function BrowsePage() {
       try {
         // TODO (candidate): pass the active filters and map viewport here so the
         // server returns only what is relevant, instead of every listing.
-        const data = await fetchProperties();
+        // (Viewport done — static metro bbox until the map reports live bounds;
+        // filters land with the filter bar.)
+        const data = await fetchProperties({}, { bbox: METRO_VANCOUVER_BBOX });
         if (!cancelled) {
           setProperties(data);
           setState("ready");
