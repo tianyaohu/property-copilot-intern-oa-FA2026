@@ -2,13 +2,47 @@
 
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { MapContainer, Marker, TileLayer } from "react-leaflet";
+import { useEffect } from "react";
+import { MapContainer, Marker, TileLayer, useMapEvents } from "react-leaflet";
 import type { MapPanelProps } from "./MapPanel";
 
 // Roughly centers the four seeded cities (Vancouver, Richmond, Burnaby,
 // Surrey); zoom 11 keeps all 50 listings in the initial view.
 const INITIAL_CENTER: [number, number] = [49.22, -122.99];
 const INITIAL_ZOOM = 11;
+
+// Keep the map inside greater Metro Vancouver and above a minimum zoom. This
+// is UX (there is nothing to rent in the Pacific) but also bounds the
+// geohash-prefix fan-out of the worst viewport a user can request.
+const MAX_BOUNDS: [[number, number], [number, number]] = [
+  [48.8, -123.6],
+  [49.7, -122.2]
+];
+const MIN_ZOOM = 10;
+
+// The map is the source of truth for "where is the user looking": serialize
+// its bounds in the exact shape parseBoundingBox expects (lat first).
+function serializeBounds(map: L.Map): string {
+  const b = map.getBounds();
+  return `${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`;
+}
+
+// Reports the visible bounds upward on mount (so the very first fetch already
+// has a real viewport) and after every pan/zoom (moveend also fires at the end
+// of a zoom). Rendered inside MapContainer because useMapEvents needs the map
+// context.
+function ViewportReporter({ onBoundsChange }: Pick<MapPanelProps, "onBoundsChange">) {
+  const map = useMapEvents({
+    moveend: () => onBoundsChange?.(serializeBounds(map))
+  });
+
+  useEffect(() => {
+    onBoundsChange?.(serializeBounds(map));
+    // Mount-only by design: moveend covers every later change.
+  }, []);
+
+  return null;
+}
 
 const CAD = new Intl.NumberFormat("en-CA", {
   style: "currency",
@@ -43,12 +77,15 @@ function priceIcon(rent: number, active: boolean): L.DivIcon {
   return icon;
 }
 
-export function MapInner({ properties, activeId, onSelect }: MapPanelProps) {
+export function MapInner({ properties, activeId, onSelect, onBoundsChange }: MapPanelProps) {
   return (
     <div className="h-[420px] w-full overflow-hidden rounded-lg border border-gray-200 lg:h-full">
       <MapContainer
         center={INITIAL_CENTER}
         zoom={INITIAL_ZOOM}
+        minZoom={MIN_ZOOM}
+        maxBounds={MAX_BOUNDS}
+        maxBoundsViscosity={1.0}
         scrollWheelZoom
         className="h-full w-full"
       >
@@ -56,6 +93,7 @@ export function MapInner({ properties, activeId, onSelect }: MapPanelProps) {
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         />
+        <ViewportReporter onBoundsChange={onBoundsChange} />
         {properties.map((property) => (
           <Marker
             key={property.id}

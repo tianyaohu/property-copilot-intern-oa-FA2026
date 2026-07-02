@@ -7,6 +7,8 @@ export type MapPanelProps = {
   properties: Property[];
   activeId?: string | null;
   onSelect?: (id: string) => void;
+  /** Called with "minLat,minLng,maxLat,maxLng" on mount and after every pan/zoom. */
+  onBoundsChange?: (bbox: string) => void;
 };
 
 /**
