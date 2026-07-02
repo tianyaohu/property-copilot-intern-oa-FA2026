@@ -49,6 +49,25 @@ export function boundingBoxPrefixes(box: BoundingBox): string[] {
   return Array.from(new Set(cells));
 }
 
+// Prefix-cell dimensions at GEOHASH_PREFIX_LENGTH (precision 5): a geohash of
+// odd length splits its bits 12 latitude / 13 longitude, so each cell spans
+// 180/2^12 by 360/2^13 degrees (~4.9 km × 4.9 km at this latitude).
+const PREFIX_CELL_LAT_DEG = 180 / 2 ** 12;
+const PREFIX_CELL_LNG_DEG = 360 / 2 ** 13;
+
+/**
+ * Cheap upper-bound estimate of how many prefix cells cover a box. Computed
+ * arithmetically so an oversized box can be rejected BEFORE
+ * `ngeohash.bboxes` runs — a world-scale box at precision 5 is ~33 million
+ * cells, which would be allocated as strings before an after-the-fact guard
+ * ever saw a count.
+ */
+export function estimatePrefixCount(box: BoundingBox): number {
+  const rows = Math.floor((box.maxLat - box.minLat) / PREFIX_CELL_LAT_DEG) + 2;
+  const cols = Math.floor((box.maxLng - box.minLng) / PREFIX_CELL_LNG_DEG) + 2;
+  return rows * cols;
+}
+
 /** Whether a coordinate lies inside a bounding box (inclusive edges). */
 export function isInBoundingBox(lat: number, lng: number, box: BoundingBox): boolean {
   return lat >= box.minLat && lat <= box.maxLat && lng >= box.minLng && lng <= box.maxLng;

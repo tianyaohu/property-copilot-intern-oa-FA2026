@@ -3,12 +3,19 @@ import {
   GEOHASH_PREFIX_LENGTH,
   boundingBoxPrefixes,
   encodeGeohash,
+  estimatePrefixCount,
   geohashPrefix,
   isInBoundingBox,
   parseBoundingBox,
   type BoundingBox
 } from "../backend/src/geo";
-import { dedupeById, refineToBox } from "../backend/src/properties";
+import {
+  MAX_PREFIXES,
+  ViewportTooLargeError,
+  dedupeById,
+  queryByBoundingBox,
+  refineToBox
+} from "../backend/src/properties";
 import type { Property } from "../backend/src/types";
 
 // A box covering roughly downtown Vancouver.
@@ -139,5 +146,27 @@ describe("property helpers", () => {
 
     expect(deduped).toHaveLength(1);
     expect(deduped[0]).toMatchObject({ title: "Replacement listing", lat: 49.29, lng: -123.11 });
+  });
+});
+
+describe("fan-out guard", () => {
+  // The largest viewport the frontend can produce (its maxBounds box).
+  const MAX_UI_BOX: BoundingBox = { minLat: 48.8, minLng: -123.6, maxLat: 49.7, maxLng: -122.2 };
+  const WORLD_BOX: BoundingBox = { minLat: -89, minLng: -179, maxLat: 89, maxLng: 179 };
+
+  test("estimatePrefixCount upper-bounds the real cell count", () => {
+    for (const box of [VANCOUVER_BOX, MAX_UI_BOX]) {
+      expect(estimatePrefixCount(box)).toBeGreaterThanOrEqual(boundingBoxPrefixes(box).length);
+    }
+  });
+
+  test("every UI-reachable viewport passes the guard", () => {
+    expect(estimatePrefixCount(MAX_UI_BOX)).toBeLessThanOrEqual(MAX_PREFIXES);
+  });
+
+  test("a world-scale box is rejected before any DynamoDB work", async () => {
+    // No DynamoDB is running in unit tests: this only passes because the guard
+    // throws before the first Query is sent.
+    await expect(queryByBoundingBox(WORLD_BOX)).rejects.toThrow(ViewportTooLargeError);
   });
 });

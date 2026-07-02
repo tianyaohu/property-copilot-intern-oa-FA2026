@@ -47,7 +47,11 @@ export class PropertiesStack extends cdk.Stack {
       projectRoot: repoRoot,
       depsLockFilePath: path.join(repoRoot, "package-lock.json"),
       runtime: lambda.Runtime.NODEJS_22_X,
-      memorySize: 256,
+      // Lambda CPU scales with memory, and the viewport query's parallel
+      // geo-index fan-out is CPU-bound (TLS + request signing): measured on the
+      // 104-partition initial metro view, 256 MB ran 0.9–1.5 s in-function vs
+      // 0.2–0.33 s at 1024 MB. Still comfortably inside the always-free tier.
+      memorySize: 1024,
       timeout: cdk.Duration.seconds(10),
       environment: {
         PROPERTIES_TABLE: table.tableName

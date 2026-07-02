@@ -1,6 +1,6 @@
 import { filterProperties, parseFilter } from "./filter";
 import { parseBoundingBox } from "./geo";
-import { getPropertyById, queryByBoundingBox } from "./properties";
+import { getPropertyById, queryByBoundingBox, ViewportTooLargeError } from "./properties";
 
 export type ApiRequest = {
   method: string;
@@ -62,9 +62,22 @@ export async function route(req: ApiRequest): Promise<ApiResponse> {
         body: { error: "Invalid bbox (expected bbox=minLat,minLng,maxLat,maxLng)" }
       };
     }
-    const inView = await queryByBoundingBox(box);
-    const properties = filterProperties(inView, parseFilter(req.query));
-    return { statusCode: 200, body: { properties, count: properties.length } };
+    let inView;
+    try {
+      inView = await queryByBoundingBox(box);
+    } catch (err) {
+      // The frontend's minZoom/maxBounds make this unreachable from the UI;
+      // it protects the raw API from oversized fan-out.
+      if (err instanceof ViewportTooLargeError) {
+        return { statusCode: 400, body: { error: "Viewport too large; zoom in" } };
+      }
+      throw err;
+    }
+    const properties = filterProperties(inView.properties, parseFilter(req.query));
+    return {
+      statusCode: 200,
+      body: { properties, count: properties.length, truncated: inView.truncated }
+    };
   }
 
   return { statusCode: 404, body: { error: "Not found" } };
