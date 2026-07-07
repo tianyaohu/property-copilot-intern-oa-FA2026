@@ -29,6 +29,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint
+        run: npm run lint
+
       # Unit tests (geo math, filters, seed data) are pure. The integration
       # tests (tests/properties.integration.test.ts) exercise the geo-index
       # query path against the dynamodb-local service container above; they
