@@ -90,7 +90,15 @@ const METRO_BBOX = "49.0,-123.35,49.45,-122.6";
 
 async function getProperties(query: Record<string, string | undefined>) {
   const res = await route({ method: "GET", path: "/properties", query });
-  return { ...res, body: res.body as { properties?: Property[]; count?: number; error?: string } };
+  return {
+    ...res,
+    body: res.body as {
+      properties?: Property[];
+      count?: number;
+      truncated?: boolean;
+      error?: string;
+    }
+  };
 }
 
 function ids(properties: Property[] | undefined): string[] {
@@ -116,6 +124,7 @@ describe.runIf(!!ENDPOINT)("GET /properties (integration, DynamoDB Local)", () =
     expect(res.statusCode).toBe(200);
     expect(ids(res.body.properties)).toEqual(["dt-cheap", "dt-pricey"]);
     expect(res.body.count).toBe(2);
+    expect(res.body.truncated).toBe(false);
   });
 
   it("excludes a listing outside the box even when its geohash cell overlaps", async () => {
@@ -132,9 +141,10 @@ describe.runIf(!!ENDPOINT)("GET /properties (integration, DynamoDB Local)", () =
     expect(ids(res.body.properties)).toEqual(["dt-pricey", "kits", "richmond"]);
   });
 
-  it("returns everything in a metro-wide box", async () => {
+  it("returns everything in a metro-wide box, unclipped by the result cap", async () => {
     const res = await getProperties({ bbox: METRO_BBOX });
     expect(res.body.count).toBe(FIXTURES.length);
+    expect(res.body.truncated).toBe(false);
   });
 
   it("rejects a missing bbox", async () => {
@@ -147,5 +157,20 @@ describe.runIf(!!ENDPOINT)("GET /properties (integration, DynamoDB Local)", () =
     const res = await getProperties({ bbox: "not,a,real,box" });
     expect(res.statusCode).toBe(400);
     expect(res.body.error).toMatch(/invalid bbox/i);
+  });
+
+  it("serves a listing by id", async () => {
+    const res = await route({ method: "GET", path: "/properties/dt-cheap", query: {} });
+    expect(res.statusCode).toBe(200);
+    expect((res.body as { property: Property }).property).toMatchObject({
+      id: "dt-cheap",
+      rent: 2400,
+      city: "Vancouver"
+    });
+  });
+
+  it("404s for an unknown listing id", async () => {
+    const res = await route({ method: "GET", path: "/properties/no-such-id", query: {} });
+    expect(res.statusCode).toBe(404);
   });
 });
