@@ -5,9 +5,9 @@ export default function HomePage() {
     <section className="space-y-4">
       <h1 className="text-2xl font-semibold">Property Copilot — Map Browser</h1>
       <p className="max-w-2xl text-sm text-gray-700">
-        A starting point for a map-based rental browser across Metro Vancouver. The
-        backend (AWS) serves 50 seeded listings; your job is the map and filtering
-        experience on top of it. See CANDIDATE.md.
+        A map-based rental browser for Metro Vancouver. Listings are served from
+        DynamoDB through a geospatial viewport query; browse them on the map and
+        narrow them down with composable filters.
       </p>
       <Link
         className="inline-block rounded border px-3 py-2 text-sm hover:border-gray-400"
