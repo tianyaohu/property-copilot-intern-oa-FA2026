@@ -1,3 +1,4 @@
+import { CORS_HEADERS } from "./cors";
 import { route } from "./router";
 
 /**
@@ -14,13 +15,6 @@ type HttpApiResult = {
   statusCode: number;
   headers: Record<string, string>;
   body: string;
-};
-
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type",
-  "Content-Type": "application/json"
 };
 
 /**
