@@ -1,13 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { CAD } from "@/lib/format";
 import type { Property } from "@/lib/types";
-
-const CAD = new Intl.NumberFormat("en-CA", {
-  style: "currency",
-  currency: "CAD",
-  maximumFractionDigits: 0
-});
 
 function bedroomLabel(bedrooms: number): string {
   return bedrooms === 0 ? "Studio" : `${bedrooms} bd`;
