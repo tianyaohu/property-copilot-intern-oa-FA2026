@@ -12,19 +12,7 @@ export type MapPanelProps = {
 };
 
 /**
- * PLACEHOLDER — this is where the map goes, and it is the core of the OA.
- *
- * Replace this component with a real, performant map (Google Maps, Mapbox, or
- * OpenStreetMap/Leaflet — your call, justify it in REPORT.md) that:
- *   - renders a marker for every property at its lat/lng,
- *   - stays smooth with all markers visible (clustering or viewport rendering),
- *   - selects a listing when its marker is clicked, and stays in sync with the
- *     list (the `activeId` / `onSelect` props are wired for you), and
- *   - ideally drives a server-side viewport query as the map pans/zooms.
- *
- * The props you need are already threaded through from the browse page.
- *
- * Implemented with MapLibre GL via react-map-gl (see MapInner), styled with
+ * Map panel: MapLibre GL via react-map-gl (see MapInner), styled with
  * OpenFreeMap's free, keyless vector tiles. Constructing a MapLibre map
  * creates a WebGL canvas and touches browser-only APIs that don't exist
  * during server rendering, so the real map must never render on the server:

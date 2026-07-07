@@ -3,7 +3,7 @@ import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 
 export const TABLE_NAME = process.env.PROPERTIES_TABLE ?? "Properties";
 
-/** Name of the geospatial GSI defined in the CDK stack (infra/lib/stack.ts). */
+/** Name of the geospatial GSI defined in the CDK stack (infra/lib/properties-stack.ts). */
 export const GEO_INDEX = "geo-index";
 
 let docClient: DynamoDBDocumentClient | undefined;
