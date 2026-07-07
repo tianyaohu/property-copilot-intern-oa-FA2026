@@ -73,10 +73,25 @@ tests/          Vitest unit tests (geo math, filters, seed data)
 npm test
 ```
 
-The suite covers the geohash helpers (`tests/geo.test.ts`), filter composition
-(`tests/filter.test.ts`), and the seed data set (`tests/seed-data.test.ts`).
-These are pure and need no database. Add tests for the geospatial query and any
-new logic you write.
+The unit suites are pure and need no database: geohash helpers and the fan-out
+guard (`tests/geo.test.ts`), filter composition (`tests/filter.test.ts`), the
+request router (`tests/router.test.ts`), the Lambda adapter
+(`tests/handlers.test.ts`), and the seed data set (`tests/seed-data.test.ts`).
+
+The **geospatial integration suite** (`tests/properties.integration.test.ts`)
+runs the full path — bbox parse → geo-index GSI query fan-out → dedupe →
+exact-box refine → attribute filters → result cap — against a real DynamoDB
+engine. It needs DynamoDB Local and the `DYNAMODB_ENDPOINT` env var; without
+the var it self-skips so plain `npm test` stays green without Docker:
+
+```bash
+docker compose up -d
+DYNAMODB_ENDPOINT=http://localhost:8000 npm test
+```
+
+The suite creates (and resets) its own `Properties-test` table, so no seeding
+is required. CI runs it on every push via a `dynamodb-local` service container
+(see `.github/workflows/ci.yml`).
 
 ## Deploying
 
