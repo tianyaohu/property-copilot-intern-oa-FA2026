@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchProperties } from "@/lib/api";
 import type { Property, PropertyFilter } from "@/lib/types";
-import { FilterBar } from "@/components/FilterBar";
+import { FilterPillBar } from "@/components/FilterPillBar";
 import { PropertyCard } from "@/components/PropertyCard";
 import { MapPanel } from "@/components/MapPanel";
 
@@ -33,11 +33,9 @@ export default function BrowsePage() {
   useEffect(() => {
     if (bbox === null) return;
 
-    // TODO (candidate): pass the active filters and map viewport here so the
-    // server returns only what is relevant, instead of every listing.
-    // (Done: the map's live bounds and the filter bar's state compose into one
-    // server query. Typing in a filter input resets the same debounce timer,
-    // so rapid changes coalesce into a single request.)
+    // The map's live bounds and the filter bar's state compose into one server
+    // query. Typing in a filter input resets the same debounce timer, so rapid
+    // changes coalesce into a single request.
     const timer = window.setTimeout(() => {
       abortRef.current?.abort();
       const controller = new AbortController();
@@ -87,18 +85,18 @@ export default function BrowsePage() {
       <div>
         <h1 className="text-2xl font-semibold">Browse rentals</h1>
         <p className="text-sm text-gray-600">
-          Metro Vancouver listings. Filters and the map are yours to build.
+          Rental listings across Metro Vancouver. Pan the map or adjust the
+          filters — the list and map always show the same results.
         </p>
       </div>
 
       {/*
-        TODO (candidate): a filter bar goes here (rent range, bedrooms, property
-        type, + one more dimension). Filters should update both the list and the
-        map, compose correctly, and be easy to reset.
-        (Done: rent range, bedrooms, bathrooms — the extra dimension — and
-        property type; active-filter chips with per-chip clear and Reset all.)
+        Property-type pills apply instantly. "Price" and "Bd/Ba" each open a
+        small quick-access popover for just that dimension; "Filters" opens
+        the master panel bundling rent range and bedrooms/bathrooms together.
+        All of them write to the same filter state, so every surface agrees.
       */}
-      <FilterBar filter={filter} onChange={setFilter} />
+      <FilterPillBar filter={filter} onChange={setFilter} />
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
         <div className="space-y-3">

@@ -27,7 +27,8 @@ export type Property = {
 export type PropertyFilter = {
   minRent?: number;
   maxRent?: number;
-  bedrooms?: number; // minimum number of bedrooms
+  bedrooms?: number; // minimum number of bedrooms, or exact count when bedroomsExact is true
+  bedroomsExact?: boolean;
   bathrooms?: number; // minimum number of bathrooms
   propertyType?: PropertyType;
 };
