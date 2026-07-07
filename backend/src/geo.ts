@@ -79,6 +79,9 @@ export function parseBoundingBox(query: Record<string, string | undefined>): Bou
 
   const parts = raw.split(",");
   if (parts.length !== 4) return null;
+  // Number("") is 0, so a blank component like "0,,1,1" would silently parse
+  // as coordinate 0 without this guard.
+  if (parts.some((part) => part.trim() === "")) return null;
 
   const minLat = Number(parts[0]);
   const minLng = Number(parts[1]);

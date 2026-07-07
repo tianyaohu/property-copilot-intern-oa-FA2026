@@ -17,6 +17,7 @@ import {
   refineToBox
 } from "../backend/src/properties";
 import type { Property } from "../backend/src/types";
+import { makeProperty } from "./fixtures";
 
 // A box covering roughly downtown Vancouver.
 const VANCOUVER_BOX: BoundingBox = {
@@ -83,45 +84,21 @@ describe('parseBoundingBox', () => {
   it('returns null when bounds are inverted', () => {
     expect(parseBoundingBox({ bbox: '10,0,0,10' })).toBeNull();
   });
-  
+
+  it('returns null when a component is empty instead of coercing it to 0', () => {
+    // Number("") === 0 is finite, so without an explicit guard "0,,1,1"
+    // would silently parse as minLng: 0.
+    expect(parseBoundingBox({ bbox: '0,,1,1' })).toBeNull();
+    expect(parseBoundingBox({ bbox: ',,,' })).toBeNull();
+    expect(parseBoundingBox({ bbox: '0, ,1,1' })).toBeNull();
+  });
 });
 
 describe("property helpers", () => {
-  const baseProperty = {
-    id: "listing-1",
-    title: "Test listing",
-    description: "",
-    rent: 2000,
-    bedrooms: 1,
-    bathrooms: 1,
-    propertyType: "apartment",
-    squareFeet: 500,
-    street: "123 Main St",
-    city: "Vancouver",
-    province: "BC",
-    postalCode: "V6B 1A1",
-    geohash: "abc1234",
-    geohashPrefix: "abc12",
-    lat: 49.28,
-    lng: -123.12,
-    images: [],
-    createdAt: "2026-01-01T00:00:00.000Z",
-  } satisfies Property;
-
   test("refineToBox keeps only points inside the exact box", () => {
     const items: Property[] = [
-      {
-        ...baseProperty,
-        id: "inside",
-        lat: 49.28,
-        lng: -123.12,
-      },
-      {
-        ...baseProperty,
-        id: "outside",
-        lat: 49.19,
-        lng: -122.85,
-      },
+      makeProperty({ id: "inside", lat: 49.28, lng: -123.12 }),
+      makeProperty({ id: "outside", lat: 49.19, lng: -122.85 })
     ];
 
     expect(refineToBox(items, VANCOUVER_BOX).map((item) => item.id)).toEqual(["inside"]);
@@ -129,17 +106,8 @@ describe("property helpers", () => {
 
   test("dedupeById collapses duplicate ids", () => {
     const items: Property[] = [
-      {
-        ...baseProperty,
-        lat: 49.28,
-        lng: -123.12,
-      },
-      {
-        ...baseProperty,
-        title: "Replacement listing",
-        lat: 49.29,
-        lng: -123.11,
-      },
+      makeProperty({ lat: 49.28, lng: -123.12 }),
+      makeProperty({ title: "Replacement listing", lat: 49.29, lng: -123.11 })
     ];
 
     const deduped = dedupeById(items);
@@ -171,8 +139,9 @@ describe("fan-out guard", () => {
   });
 
   test("a world-scale box is rejected before any DynamoDB work", async () => {
-    // No DynamoDB is running in unit tests: this only passes because the guard
-    // throws before the first Query is sent.
+    // Passes with or without a live DynamoDB (CI exports DYNAMODB_ENDPOINT;
+    // plain local runs don't): the guard throws on the arithmetic estimate
+    // before the first Query would be sent, so no database is ever contacted.
     await expect(queryByBoundingBox(WORLD_BOX)).rejects.toThrow(ViewportTooLargeError);
   });
 });
