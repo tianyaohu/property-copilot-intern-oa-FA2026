@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Map as MaplibreMap } from "maplibre-gl";
 import { Map, Marker } from "react-map-gl/maplibre";
+import { CAD, formatCompactRent } from "@/lib/format";
 import type { MapPanelProps } from "./MapPanel";
 
 // Roughly centers the four seeded cities (Vancouver, Richmond, Burnaby,
@@ -11,25 +13,40 @@ import type { MapPanelProps } from "./MapPanel";
 // like Leaflet) — easy to transpose by mistake.
 const INITIAL_VIEW_STATE = { longitude: -122.99, latitude: 49.22, zoom: 11 };
 
+// Below this zoom, price pills collapse into plain circles; the initial
+// view (zoom 11) stays in pill mode, matching the default look above.
+const CIRCLE_ZOOM_THRESHOLD = 10;
+
 // OpenFreeMap hosts this vector style for free, no API key or billing
 // account required.
 const MAP_STYLE_URL =
   process.env.NEXT_PUBLIC_MAP_STYLE_URL ?? "https://tiles.openfreemap.org/styles/liberty";
 
+const clamp = (value: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, value));
+
 // The map is the source of truth for "where is the user looking": serialize
 // its bounds in the exact shape parseBoundingBox expects (lat first).
+// MapLibre's getBounds() does not wrap or clamp — zoomed out past the world,
+// or panned across the antimeridian, it returns longitudes beyond ±180 (and
+// latitudes beyond ±90), which the server rejects as an invalid bbox. Clamping
+// keeps the request valid, so an oversized viewport surfaces as the intended
+// "Viewport too large; zoom in" from the fan-out guard instead of a parse
+// error. (An antimeridian-crossing view collapses to a wide valid box — an
+// acceptable trade-off for a metro-area product.)
 function serializeBounds(map: MaplibreMap): string {
   const b = map.getBounds();
-  return `${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`;
+  const south = clamp(b.getSouth(), -90, 90);
+  const west = clamp(b.getWest(), -180, 180);
+  const north = clamp(b.getNorth(), -90, 90);
+  const east = clamp(b.getEast(), -180, 180);
+  return `${south},${west},${north},${east}`;
 }
 
-const CAD = new Intl.NumberFormat("en-CA", {
-  style: "currency",
-  currency: "CAD",
-  maximumFractionDigits: 0
-});
-
 export function MapInner({ properties, activeId, onSelect, onBoundsChange }: MapPanelProps) {
+  const [isCircleZoom, setIsCircleZoom] = useState(INITIAL_VIEW_STATE.zoom < CIRCLE_ZOOM_THRESHOLD);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+
   return (
     <div className="h-[420px] w-full overflow-hidden rounded-lg border border-gray-200 lg:h-full">
       {/*
@@ -46,34 +63,69 @@ export function MapInner({ properties, activeId, onSelect, onBoundsChange }: Map
         style={{ width: "100%", height: "100%" }}
         onLoad={(e) => onBoundsChange?.(serializeBounds(e.target))}
         onMoveEnd={(e) => onBoundsChange?.(serializeBounds(e.target))}
+        onZoom={(e) => {
+          // Fires only on zoom gestures, not pure pans, so panning within
+          // the same zoom mode doesn't re-render all markers. Only touches
+          // state on an actual threshold crossing.
+          const circle = e.viewState.zoom < CIRCLE_ZOOM_THRESHOLD;
+          setIsCircleZoom((prev) => (prev === circle ? prev : circle));
+        }}
       >
         {properties.map((property) => {
           const active = property.id === activeId;
+          const hovered = property.id === hoveredId;
+          // Full pill size/text whenever at pill-zoom, or whenever hovered
+          // (a hovered circle always expands to reveal its price).
+          const expanded = !isCircleZoom || hovered;
+          // Hovered always wins to the very top; otherwise the selected
+          // marker keeps its usual above-the-pack z-index.
+          const zIndex = hovered ? 2000 : active ? 1000 : 0;
+          // Text content tracks zoom mode only, not hover: pill-mode keeps
+          // the full currency string even when hover-lifted; circle-mode
+          // reveals the compact string when hover-expanded.
+          const priceText = isCircleZoom ? formatCompactRent(property.rent) : CAD.format(property.rent);
+
           return (
             <Marker
               key={property.id}
               longitude={property.lng}
               latitude={property.lat}
-              style={{ zIndex: active ? 1000 : 0 }}
+              style={{ zIndex }}
               onClick={(e) => {
                 e.originalEvent.stopPropagation();
                 onSelect?.(property.id);
               }}
             >
               {/*
-                Price-pill marker instead of the default pin: a rent label
-                carries more information than a pin. No translate/anchor
-                classes here — MapLibre's Marker already centers this element
-                on the coordinate; adding one on top would double-center it.
+                Price-pill marker instead of the default pin. Below
+                CIRCLE_ZOOM_THRESHOLD it collapses to a plain circle (no
+                text) unless hovered. No translate/anchor classes here —
+                MapLibre already centers this element on the coordinate via
+                a transform that recomputes live against this element's own
+                box size, so the width/height transition below stays
+                perfectly centered with no extra positioning code.
+
+                Width is animated via max-width (never a fixed width) so it
+                can transition smoothly to/from the circle's collapsed size:
+                CSS can't smoothly interpolate to/from `width: auto`, but
+                max-width against a fixed target can, and actual rendered
+                width is always min(content, max-width).
               */}
               <div
-                className={`inline-block w-max cursor-pointer whitespace-nowrap rounded-full border px-3 py-1.5 text-sm font-semibold shadow ${
-                  active
-                    ? "border-black bg-black text-white"
-                    : "border-gray-300 bg-white text-gray-900"
-                }`}
+                onMouseEnter={() => setHoveredId(property.id)}
+                onMouseLeave={() => setHoveredId((current) => (current === property.id ? null : current))}
+                className={[
+                  "inline-flex cursor-pointer items-center justify-center overflow-hidden",
+                  "whitespace-nowrap rounded-full border text-sm font-semibold",
+                  "transition-all duration-200 ease-out",
+                  expanded ? "h-8 max-w-32 px-3 py-1.5" : "h-3 max-w-3 px-0 py-0",
+                  hovered ? "scale-110 shadow-xl" : "scale-100 shadow",
+                  active ? "border-black bg-black text-white" : "border-gray-300 bg-white text-gray-900"
+                ].join(" ")}
               >
-                {CAD.format(property.rent)}
+                <span className={`transition-opacity duration-200 ${expanded ? "opacity-100" : "opacity-0"}`}>
+                  {priceText}
+                </span>
               </div>
             </Marker>
           );
