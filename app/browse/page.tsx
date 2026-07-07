@@ -25,6 +25,9 @@ export default function BrowsePage() {
   const [bbox, setBbox] = useState<string | null>(null);
   // Active renter filters; composed with the viewport into one server query.
   const [filter, setFilter] = useState<PropertyFilter>({});
+  // True when the server clipped the response to its result cap; drives a
+  // "zoom in to see all" hint next to the listing count.
+  const [truncated, setTruncated] = useState(false);
   // Refetches (pan/zoom) keep the previous list on screen; this drives a small
   // "Updating…" hint instead of the full-page loading state.
   const [isFetching, setIsFetching] = useState(false);
@@ -44,7 +47,8 @@ export default function BrowsePage() {
 
       fetchProperties(filter, { bbox, signal: controller.signal })
         .then((data) => {
-          setProperties(data);
+          setProperties(data.properties);
+          setTruncated(data.truncated);
           setState("ready");
           setError("");
         })
@@ -113,6 +117,9 @@ export default function BrowsePage() {
               <div className="flex items-baseline justify-between text-sm text-gray-600">
                 <span>
                   {properties.length} listing{properties.length === 1 ? "" : "s"} in view
+                  {truncated ? (
+                    <span className="text-gray-500"> — zoom in to see all</span>
+                  ) : null}
                 </span>
                 <span
                   aria-live="polite"

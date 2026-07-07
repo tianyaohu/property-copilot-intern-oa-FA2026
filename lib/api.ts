@@ -9,7 +9,13 @@ async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
     signal
   });
 
-  const body = await response.json().catch(() => null);
+  // Non-JSON bodies become null so the status check below still produces a
+  // useful error — but an abort mid-body-read must stay an AbortError, or a
+  // cancelled stale request would surface upstream as a real failure.
+  const body = await response.json().catch((err: unknown) => {
+    if ((err as Error)?.name === "AbortError") throw err;
+    return null;
+  });
   if (!response.ok) {
     throw new Error(body?.error ?? `Request failed (${response.status})`);
   }
@@ -35,15 +41,21 @@ export type FetchPropertiesOptions = {
   signal?: AbortSignal;
 };
 
+export type PropertiesResult = {
+  properties: Property[];
+  /** True when the server clipped the response to its result cap. */
+  truncated: boolean;
+};
+
 export async function fetchProperties(
   filter: PropertyFilter = {},
   options: FetchPropertiesOptions = {}
-): Promise<Property[]> {
-  const data = await apiGet<{ properties: Property[] }>(
+): Promise<PropertiesResult> {
+  const data = await apiGet<{ properties: Property[]; truncated?: boolean }>(
     `/properties${toQueryString(filter, options.bbox)}`,
     options.signal
   );
-  return data.properties;
+  return { properties: data.properties, truncated: data.truncated ?? false };
 }
 
 export async function fetchProperty(id: string): Promise<Property> {
