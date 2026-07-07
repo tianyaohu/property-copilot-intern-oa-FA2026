@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { generateProperties } from "../backend/src/seed-data";
 import { withGeoAttributes } from "../backend/src/properties";
+import { encodeGeohash, geohashPrefix } from "../backend/src/geo";
 
 const CITIES = ["Vancouver", "Richmond", "Burnaby", "Surrey"];
 
@@ -16,7 +17,7 @@ describe("seed data", () => {
     expect(generateProperties()).toEqual(properties);
   });
 
-  test("every listing covers the four target cities", () => {
+  test("the listings collectively span all four target cities", () => {
     const cities = new Set(properties.map((p) => p.city));
     expect([...cities].sort()).toEqual([...CITIES].sort());
   });
@@ -35,7 +36,7 @@ describe("seed data", () => {
 
   test("geo attributes are derived from coordinates", () => {
     const withGeo = withGeoAttributes(properties[0]);
-    expect(withGeo.geohash.length).toBeGreaterThan(0);
-    expect(withGeo.geohash.startsWith(withGeo.geohashPrefix)).toBe(true);
+    expect(withGeo.geohash).toBe(encodeGeohash(properties[0].lat, properties[0].lng));
+    expect(withGeo.geohashPrefix).toBe(geohashPrefix(withGeo.geohash));
   });
 });
