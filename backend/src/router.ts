@@ -1,6 +1,11 @@
-import { filterProperties, parseFilter } from "./filter";
+import { filterProperties, parseFilter, validateFilter } from "./filter";
 import { parseBoundingBox } from "./geo";
-import { getPropertyById, queryByBoundingBox, ViewportTooLargeError } from "./properties";
+import {
+  capResults,
+  getPropertyById,
+  queryByBoundingBox,
+  ViewportTooLargeError
+} from "./properties";
 
 export type ApiRequest = {
   method: string;
@@ -39,15 +44,14 @@ export async function route(req: ApiRequest): Promise<ApiResponse> {
 
   // GET /properties
   //
-  // BASELINE: scans the whole table, applies attribute filters server-side, and
-  // returns the result. There is no viewport/bounding-box support yet — add it
-  // here (read `bbox` from the query, call your geospatial query) so the map
-  // does not request every listing on the planet.
-  //
-  // Implemented: `bbox` (minLat,minLng,maxLat,maxLng) is required — the
-  // geo-index GSI is the only read path, so a request's cost is proportional
-  // to its viewport and there is no scan-the-world fallback. Attribute filters
-  // compose after the geospatial query, reusing the pure logic in filter.ts.
+  // `bbox` (minLat,minLng,maxLat,maxLng) is required — the geo-index GSI is
+  // the only read path, so a request's cost is proportional to its viewport
+  // and there is no scan-the-world fallback. An invalid filter (negative
+  // bound, or an inverted rent range) is also rejected before any query
+  // runs — otherwise it would silently produce an empty result that reads
+  // as "no listings" rather than "bad request". Attribute filters compose
+  // after the geospatial query (reusing the pure logic in filter.ts), and
+  // the result cap runs last so filters never lose matches to it.
   if (req.path === "/properties") {
     if (req.query.bbox === undefined) {
       return {
@@ -62,6 +66,12 @@ export async function route(req: ApiRequest): Promise<ApiResponse> {
         body: { error: "Invalid bbox (expected bbox=minLat,minLng,maxLat,maxLng)" }
       };
     }
+    const parsedFilter = parseFilter(req.query);
+    const filterError = validateFilter(parsedFilter);
+    if (filterError) {
+      return { statusCode: 400, body: { error: filterError } };
+    }
+
     let inView;
     try {
       inView = await queryByBoundingBox(box);
@@ -75,10 +85,11 @@ export async function route(req: ApiRequest): Promise<ApiResponse> {
       }
       throw err;
     }
-    const properties = filterProperties(inView.properties, parseFilter(req.query));
+    const filtered = filterProperties(inView, parsedFilter);
+    const { properties, truncated } = capResults(filtered);
     return {
       statusCode: 200,
-      body: { properties, count: properties.length, truncated: inView.truncated }
+      body: { properties, count: properties.length, truncated }
     };
   }
 

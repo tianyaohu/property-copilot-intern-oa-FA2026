@@ -5,9 +5,9 @@ import type { Property, PropertyFilter } from "./types";
  * is easy to unit test and reuse on either side of the wire.
  *
  * Filters compose: every provided constraint must hold for an item to pass.
- * This is the baseline filter set (rent range, minimum bedrooms, property
- * type). Extend it with additional dimensions (bathrooms, square footage,
- * keyword) as you build out filtering.
+ * Rent is an inclusive range; bathrooms is an inclusive minimum; bedrooms is
+ * an inclusive minimum by default, or an exact match when bedroomsExact is
+ * set; property type matches exactly.
  */
 export function filterProperties(properties: Property[], filter: PropertyFilter): Property[] {
   return properties.filter((property) => {
@@ -17,8 +17,13 @@ export function filterProperties(properties: Property[], filter: PropertyFilter)
     if (filter.maxRent !== undefined && property.rent > filter.maxRent) {
       return false;
     }
-    if (filter.bedrooms !== undefined && property.bedrooms < filter.bedrooms) {
-      return false;
+    if (filter.bedrooms !== undefined) {
+      const bedroomsMatch = filter.bedroomsExact
+        ? property.bedrooms === filter.bedrooms
+        : property.bedrooms >= filter.bedrooms;
+      if (!bedroomsMatch) {
+        return false;
+      }
     }
     if (filter.bathrooms !== undefined && property.bathrooms < filter.bathrooms) {
       return false;
@@ -30,29 +35,70 @@ export function filterProperties(properties: Property[], filter: PropertyFilter)
   });
 }
 
-/** Parse and validate raw query-string values into a PropertyFilter. */
+/**
+ * Parse one numeric query param. Blank values are rejected explicitly:
+ * Number("") and Number("  ") are 0, so without the trim guard a URL like
+ * `?maxRent=` would silently filter out every listing instead of being ignored.
+ */
+function parseNumber(raw: string | undefined): number | undefined {
+  if (raw === undefined || raw.trim() === "") {
+    return undefined;
+  }
+  const value = Number(raw);
+  return Number.isFinite(value) ? value : undefined;
+}
+
+/**
+ * Validate a parsed PropertyFilter's domain rules: no negative bound, and a
+ * rent range that isn't inverted. Separate from parseFilter, which only
+ * handles per-field syntax (a bad propertyType or unparseable number is
+ * silently dropped there, not rejected) — an inverted or negative range is a
+ * different kind of problem, one that should fail the whole request instead
+ * of being quietly ignored, since filterProperties would otherwise just
+ * return an empty result that looks like "no listings" rather than "bad
+ * request".
+ */
+export function validateFilter(filter: PropertyFilter): string | null {
+  if (filter.minRent !== undefined && filter.minRent < 0) {
+    return "minRent must be greater than or equal to 0";
+  }
+  if (filter.maxRent !== undefined && filter.maxRent < 0) {
+    return "maxRent must be greater than or equal to 0";
+  }
+  if (filter.bedrooms !== undefined && filter.bedrooms < 0) {
+    return "bedrooms must be greater than or equal to 0";
+  }
+  if (filter.bathrooms !== undefined && filter.bathrooms < 0) {
+    return "bathrooms must be greater than or equal to 0";
+  }
+  if (
+    filter.minRent !== undefined &&
+    filter.maxRent !== undefined &&
+    filter.minRent > filter.maxRent
+  ) {
+    return "minRent must not be greater than maxRent";
+  }
+  return null;
+}
+
+/** Parse raw query-string values into a PropertyFilter, one field at a time.
+ * Per-field syntax only (blank/unparseable/invalid-enum values are omitted,
+ * not rejected) — domain-level range rules live in validateFilter. */
 export function parseFilter(query: Record<string, string | undefined>): PropertyFilter {
   const filter: PropertyFilter = {};
 
-  const minRent = Number(query.minRent);
-  if (query.minRent !== undefined && Number.isFinite(minRent)) {
-    filter.minRent = minRent;
-  }
+  const minRent = parseNumber(query.minRent);
+  if (minRent !== undefined) filter.minRent = minRent;
 
-  const maxRent = Number(query.maxRent);
-  if (query.maxRent !== undefined && Number.isFinite(maxRent)) {
-    filter.maxRent = maxRent;
-  }
+  const maxRent = parseNumber(query.maxRent);
+  if (maxRent !== undefined) filter.maxRent = maxRent;
 
-  const bedrooms = Number(query.bedrooms);
-  if (query.bedrooms !== undefined && Number.isFinite(bedrooms)) {
-    filter.bedrooms = bedrooms;
-  }
+  const bedrooms = parseNumber(query.bedrooms);
+  if (bedrooms !== undefined) filter.bedrooms = bedrooms;
+  if (query.bedroomsExact === "true") filter.bedroomsExact = true;
 
-  const bathrooms = Number(query.bathrooms);
-  if (query.bathrooms !== undefined && Number.isFinite(bathrooms)) {
-    filter.bathrooms = bathrooms;
-  }
+  const bathrooms = parseNumber(query.bathrooms);
+  if (bathrooms !== undefined) filter.bathrooms = bathrooms;
 
   if (
     query.propertyType === "apartment" ||

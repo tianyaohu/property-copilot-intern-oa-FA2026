@@ -1,4 +1,4 @@
-import { GetCommand, PutCommand, QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { GEO_INDEX, TABLE_NAME, getDocClient } from "./db";
 import {
   boundingBoxPrefixes,
@@ -10,15 +10,17 @@ import {
 } from "./geo";
 import type { Property } from "./types";
 
-// Fan-out guard, sized from measurement rather than guesswork: the largest
-// viewport the frontend can request (its maxBounds box at minZoom) estimates
-// to ~726 prefix cells, metro-wide is ~228, a typical initial view ~112. The
-// guard exists for raw API callers — a world-scale box estimates to ~33M.
+// Fan-out guard, sized from measurement rather than guesswork: a realistic
+// full-Metro-Vancouver viewport estimates to ~726 prefix cells and a typical
+// initial view ~112, both inside the cap. The map deliberately has no zoom-out
+// limit, so this guard is the real limiter for world-scale viewports (which
+// estimate to ~33M cells) — for the frontend and raw API callers alike.
 export const MAX_PREFIXES = 800;
 
-// Cap on items returned per viewport query; `truncated` tells the client to
-// zoom in for the rest. Unreachable at 50 seeded listings, load-bearing at
-// real data volumes.
+// Cap on items returned per query; `truncated` tells the client to zoom in
+// for the rest. Applied AFTER attribute filters (see capResults / router.ts)
+// so a narrow filter never loses qualifying listings to the cap. Unreachable
+// at 50 seeded listings, load-bearing at real data volumes.
 export const MAX_RESULTS = 200;
 
 /** Raised before any DynamoDB work when a bbox would fan out too widely. */
@@ -62,38 +64,10 @@ export function dedupeById(items: Property[]): Property[] {
   return Array.from(new Map(items.map((item) => [item.id, item])).values());
 }
 
-
 /**
- * BASELINE: returns every property by scanning the whole table.
- *
- * This is intentionally the naive implementation. It dumps all rows and does no
- * geospatial work. As the data set grows this scans more and more of the table
- * on every request, and it ignores the map viewport entirely.
- *
- * Your job (Backend & Data Design): replace the viewport path with a real
- * bounding-box query that uses the `geo-index` GSI and the geohash helpers in
- * geo.ts, so the server returns only what the map can see. A stub for that is
- * below.
- */
-export async function listAllProperties(): Promise<Property[]> {
-  const items: Property[] = [];
-  let lastKey: Record<string, unknown> | undefined;
-
-  do {
-    const result = await getDocClient().send(
-      new ScanCommand({ TableName: TABLE_NAME, ExclusiveStartKey: lastKey })
-    );
-    items.push(...((result.Items as Property[] | undefined) ?? []));
-    lastKey = result.LastEvaluatedKey as Record<string, unknown> | undefined;
-  } while (lastKey);
-
-  return items;
-}
-
-/**
- * Query one geo-index partition (a single geohash-prefix cell). MVP: no
- * pagination. (Hardened: now follows LastEvaluatedKey — a ~4.9 km cell in a
- * dense dataset can exceed DynamoDB's 1 MB per-Query page.)
+ * Query one geo-index partition (a single geohash-prefix cell), following
+ * LastEvaluatedKey — a ~4.9 km cell in a dense dataset can exceed DynamoDB's
+ * 1 MB per-Query page.
  */
 async function queryPrefix(prefix: string): Promise<Property[]> {
   const items: Property[] = [];
@@ -116,25 +90,34 @@ async function queryPrefix(prefix: string): Promise<Property[]> {
   return items;
 }
 
-export type BoundingBoxQueryResult = {
+export type CappedResults = {
   properties: Property[];
   /** True when MAX_RESULTS clipped the response; the client should zoom in. */
   truncated: boolean;
 };
 
 /**
- * Geospatial viewport query. Turns the box into the geohash prefixes that cover
- * it, Queries those geo-index partitions in parallel, then trims the prefix-cell
- * overhang back to the exact box. Renter filters (rent/beds/type) are composed by
- * the caller (router) so this and listAllProperties share one filter step.
- *
- * MVP: no fan-out guard / result cap / per-prefix pagination yet — see the plan's
- * hardening list. (Done: fan-out guard sized from measurement — it runs on an
- * arithmetic estimate so hostile boxes are rejected before any cell strings are
- * allocated — plus per-prefix pagination, a result cap with a `truncated` flag,
- * and a timing log per query for CloudWatch/dev-api output.)
+ * Clip a result set to MAX_RESULTS. Pure so the router can apply it after
+ * attribute filters — capping before filtering would silently drop qualifying
+ * listings whenever the raw viewport match count exceeded the cap.
  */
-export async function queryByBoundingBox(box: BoundingBox): Promise<BoundingBoxQueryResult> {
+export function capResults(properties: Property[]): CappedResults {
+  const truncated = properties.length > MAX_RESULTS;
+  return {
+    properties: truncated ? properties.slice(0, MAX_RESULTS) : properties,
+    truncated
+  };
+}
+
+/**
+ * Geospatial viewport query. Turns the box into the geohash prefixes that
+ * cover it, Queries those geo-index partitions in parallel (each paginated),
+ * then trims the prefix-cell overhang back to the exact box. The fan-out
+ * guard runs on an arithmetic estimate so hostile boxes are rejected before
+ * any cell strings are allocated. Attribute filters and the result cap are
+ * composed by the caller (router.ts) — filters first, then the cap.
+ */
+export async function queryByBoundingBox(box: BoundingBox): Promise<Property[]> {
   const estimated = estimatePrefixCount(box);
   if (estimated > MAX_PREFIXES) {
     throw new ViewportTooLargeError(estimated);
@@ -144,18 +127,15 @@ export async function queryByBoundingBox(box: BoundingBox): Promise<BoundingBoxQ
   const prefixes = boundingBoxPrefixes(box);
   const perPrefix = await Promise.all(prefixes.map(queryPrefix));
   const matches = refineToBox(dedupeById(perPrefix.flat()), box);
-  const truncated = matches.length > MAX_RESULTS;
-  const properties = truncated ? matches.slice(0, MAX_RESULTS) : matches;
 
   console.log(
     JSON.stringify({
       msg: "queryByBoundingBox",
       prefixCount: prefixes.length,
       tookMs: Date.now() - started,
-      resultCount: properties.length,
-      truncated
+      matchCount: matches.length
     })
   );
 
-  return { properties, truncated };
+  return matches;
 }
