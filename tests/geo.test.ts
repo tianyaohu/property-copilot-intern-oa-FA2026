@@ -150,18 +150,24 @@ describe("property helpers", () => {
 });
 
 describe("fan-out guard", () => {
-  // The largest viewport the frontend can produce (its maxBounds box).
-  const MAX_UI_BOX: BoundingBox = { minLat: 48.8, minLng: -123.6, maxLat: 49.7, maxLng: -122.2 };
+  // A realistic "zoomed all the way out over all of Metro Vancouver"
+  // viewport. Not a UI-imposed ceiling anymore (the map has no maxBounds/
+  // minZoom) — kept as a regression fixture proving typical real-world usage
+  // stays comfortably under MAX_PREFIXES.
+  const WIDE_METRO_BOX: BoundingBox = { minLat: 48.8, minLng: -123.6, maxLat: 49.7, maxLng: -122.2 };
+  // The frontend no longer caps zoom-out, so a box this large is now directly
+  // reachable by zooming the UI all the way out, not just a theoretical
+  // raw-API case.
   const WORLD_BOX: BoundingBox = { minLat: -89, minLng: -179, maxLat: 89, maxLng: 179 };
 
   test("estimatePrefixCount upper-bounds the real cell count", () => {
-    for (const box of [VANCOUVER_BOX, MAX_UI_BOX]) {
+    for (const box of [VANCOUVER_BOX, WIDE_METRO_BOX]) {
       expect(estimatePrefixCount(box)).toBeGreaterThanOrEqual(boundingBoxPrefixes(box).length);
     }
   });
 
-  test("every UI-reachable viewport passes the guard", () => {
-    expect(estimatePrefixCount(MAX_UI_BOX)).toBeLessThanOrEqual(MAX_PREFIXES);
+  test("a realistic wide metro viewport stays comfortably under the guard", () => {
+    expect(estimatePrefixCount(WIDE_METRO_BOX)).toBeLessThanOrEqual(MAX_PREFIXES);
   });
 
   test("a world-scale box is rejected before any DynamoDB work", async () => {

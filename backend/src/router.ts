@@ -66,8 +66,10 @@ export async function route(req: ApiRequest): Promise<ApiResponse> {
     try {
       inView = await queryByBoundingBox(box);
     } catch (err) {
-      // The frontend's minZoom/maxBounds make this unreachable from the UI;
-      // it protects the raw API from oversized fan-out.
+      // The frontend no longer caps how far a user can pan/zoom out (no
+      // minZoom, no maxBounds) — zooming out toward the whole world is a
+      // normal way to trigger this. This guard is now the real, user-facing
+      // limiter it was always meant to be, not just a raw-API safety net.
       if (err instanceof ViewportTooLargeError) {
         return { statusCode: 400, body: { error: "Viewport too large; zoom in" } };
       }
