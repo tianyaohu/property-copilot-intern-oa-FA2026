@@ -24,11 +24,13 @@ export type MapPanelProps = {
  *
  * The props you need are already threaded through from the browse page.
  *
- * Implemented with Leaflet + OpenStreetMap via react-leaflet (see MapInner).
- * Leaflet touches `window` at import time, so the real map must never render
- * on the server: next/dynamic with `ssr: false` loads it in the browser only.
- * That option is disallowed in Server Components, which is why this thin
- * client-component wrapper exists at all.
+ * Implemented with MapLibre GL via react-map-gl (see MapInner), styled with
+ * OpenFreeMap's free, keyless vector tiles. Constructing a MapLibre map
+ * creates a WebGL canvas and touches browser-only APIs that don't exist
+ * during server rendering, so the real map must never render on the server:
+ * next/dynamic with `ssr: false` loads it in the browser only. That option is
+ * disallowed in Server Components, which is why this thin client-component
+ * wrapper exists at all.
  */
 const MapInner = dynamic(() => import("./MapInner").then((mod) => mod.MapInner), {
   ssr: false,
