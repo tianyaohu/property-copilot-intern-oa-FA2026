@@ -4,7 +4,7 @@ import { useState } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Map as MaplibreMap } from "maplibre-gl";
 import { Map, Marker, Popup } from "react-map-gl/maplibre";
-import { CAD, formatCompactRent } from "@/lib/format";
+import { formatCompactRent } from "@/lib/format";
 import { PropertyCard } from "./PropertyCard";
 import type { MapPanelProps } from "./MapPanel";
 
@@ -83,10 +83,9 @@ export function MapInner({ properties, activeId, onSelect, onBoundsChange }: Map
           // Hovered always wins to the very top; otherwise the selected
           // marker keeps its usual above-the-pack z-index.
           const zIndex = hovered ? 2000 : active ? 1000 : 0;
-          // Text content tracks zoom mode only, not hover: pill-mode keeps
-          // the full currency string even when hover-lifted; circle-mode
-          // reveals the compact string when hover-expanded.
-          const priceText = isCircleZoom ? formatCompactRent(property.rent) : CAD.format(property.rent);
+          // Always the compact "3.3k" label, regardless of zoom mode — the
+          // full currency string was too wide for the pill at pill-zoom.
+          const priceText = formatCompactRent(property.rent);
 
           return (
             <Marker
@@ -121,7 +120,7 @@ export function MapInner({ properties, activeId, onSelect, onBoundsChange }: Map
                   "inline-flex cursor-pointer items-center justify-center overflow-hidden",
                   "whitespace-nowrap rounded-full border text-sm font-semibold",
                   "transition-all duration-200 ease-out",
-                  expanded ? "h-8 max-w-32 px-3 py-1.5" : "h-3 max-w-3 px-0 py-0",
+                  expanded ? "h-7 max-w-20 px-2 py-1" : "h-3 max-w-3 px-0 py-0",
                   hovered ? "scale-110 shadow-xl" : "scale-100 shadow",
                   active ? "border-black bg-black text-white" : "border-gray-300 bg-white text-gray-900"
                 ].join(" ")}

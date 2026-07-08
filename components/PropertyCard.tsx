@@ -24,10 +24,17 @@ export function PropertyCard({ property, active, onSelect }: PropertyCardProps) 
 
   // Map → list sync: when this card becomes active (its marker was clicked),
   // bring it into view. "nearest" makes it a no-op if already visible.
+  // Skipped between `sm` and `lg`: at that width, map and list are stacked
+  // in one column with no sticky map (that only starts at `lg`), so
+  // scrolling to the card yanks the map the user just clicked clean off
+  // screen. Below `sm` the list is hidden while map view is active (nothing
+  // visible to scroll to); at `lg`+ the sticky map stays in view beside the
+  // list, so the scroll there is harmless.
   useEffect(() => {
-    if (active) {
-      ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-    }
+    if (!active) return;
+    const isStackedNarrow = window.matchMedia("(min-width: 640px) and (max-width: 1023.98px)").matches;
+    if (isStackedNarrow) return;
+    ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [active]);
 
   return (
