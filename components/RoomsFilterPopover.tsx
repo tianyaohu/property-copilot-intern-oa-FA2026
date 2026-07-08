@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type RefObject } from "react";
+import type { RefObject } from "react";
 import { Popover } from "@/components/Popover";
 import { OptionRow } from "@/components/OptionRow";
 import { BATHROOM_OPTIONS, BEDROOM_OPTIONS } from "@/components/roomFilterOptions";
@@ -19,9 +19,16 @@ type RoomsFilterPopoverProps = {
 /**
  * Quick Bedrooms/Bathrooms-only popover. Bedrooms is a segmented row
  * (Studio/1/2/3/4/5) with an "exact match" toggle — unchecked means "at
- * least N" (today's minimum semantics), checked means "exactly N"; clicking
- * the already-selected value again clears it back to "Any". Bathrooms is
+ * least N" (minimum semantics), checked means "exactly N"; clicking the
+ * already-selected value again clears it back to "Any". Bathrooms is
  * minimum-only (Any/1+/2+/3+/4+), no exact-match option.
+ *
+ * Unlike PriceFilterPopover (which stages edits and needs an explicit Apply
+ * to gate on validation), every click here commits immediately — a bedroom
+ * or bathroom button click can't produce an invalid state, so there's
+ * nothing to stage or validate. The popover stays open after a click so
+ * bedrooms, bathrooms, and exact-match can be adjusted in any order; "Done"
+ * just closes it.
  */
 export function RoomsFilterPopover({
   bedrooms,
@@ -31,15 +38,7 @@ export function RoomsFilterPopover({
   onClose,
   triggerRef
 }: RoomsFilterPopoverProps) {
-  const [draft, setDraft] = useState<Rooms>({ bedrooms, bedroomsExact, bathrooms });
-
-  const handleApply = () => {
-    onApply(draft);
-    onClose();
-  };
-
   const handleClear = () => {
-    setDraft({});
     onApply({ bedrooms: undefined, bedroomsExact: undefined, bathrooms: undefined });
   };
 
@@ -54,17 +53,17 @@ export function RoomsFilterPopover({
           <p className="text-xs font-medium text-gray-600">Bedrooms</p>
           <OptionRow
             options={BEDROOM_OPTIONS}
-            value={draft.bedrooms}
+            value={bedrooms}
             onChange={(value) =>
-              setDraft((prev) => ({ ...prev, bedrooms: prev.bedrooms === value ? undefined : value }))
+              onApply({ bedrooms: bedrooms === value ? undefined : value, bedroomsExact, bathrooms })
             }
           />
           <label className="flex items-center gap-2 pt-1 text-sm text-gray-900">
             <input
               type="checkbox"
-              checked={draft.bedroomsExact ?? false}
+              checked={bedroomsExact ?? false}
               onChange={(e) =>
-                setDraft((prev) => ({ ...prev, bedroomsExact: e.target.checked || undefined }))
+                onApply({ bedrooms, bedroomsExact: e.target.checked || undefined, bathrooms })
               }
               className="h-4 w-4 rounded border-gray-300 text-black focus:ring-black"
             />
@@ -76,8 +75,8 @@ export function RoomsFilterPopover({
           <p className="text-xs font-medium text-gray-600">Bathrooms</p>
           <OptionRow
             options={BATHROOM_OPTIONS}
-            value={draft.bathrooms}
-            onChange={(value) => setDraft((prev) => ({ ...prev, bathrooms: value }))}
+            value={bathrooms}
+            onChange={(value) => onApply({ bedrooms, bedroomsExact, bathrooms: value })}
           />
         </div>
       </div>
@@ -91,10 +90,10 @@ export function RoomsFilterPopover({
         </button>
         <button
           type="button"
-          onClick={handleApply}
+          onClick={onClose}
           className="rounded-md border border-black bg-black px-4 py-2 text-sm font-semibold text-white hover:bg-gray-800"
         >
-          Apply
+          Done
         </button>
       </div>
     </Popover>
