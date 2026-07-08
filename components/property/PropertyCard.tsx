@@ -15,9 +15,9 @@ type PropertyCardProps = {
 };
 
 /**
- * Reusable listing tile. Intentionally plain — the design language is yours to
- * define. Reuse this (and add more small components like badges/buttons) across
- * the list and any detail view rather than duplicating markup.
+ * Reusable listing tile, styled from design tokens. Used in both the list grid
+ * and the map popup; the active state (accent ring) marks the selected marker's
+ * card.
  */
 export function PropertyCard({ property, active, onSelect }: PropertyCardProps) {
   const ref = useRef<HTMLElement>(null);
@@ -40,9 +40,9 @@ export function PropertyCard({ property, active, onSelect }: PropertyCardProps) 
   return (
     <article
       ref={ref}
-      className={`overflow-hidden rounded-lg border bg-white transition ${
-        active ? "border-black ring-1 ring-black" : "border-gray-200"
-      } ${onSelect ? "cursor-pointer hover:border-gray-400" : ""}`}
+      className={`overflow-hidden rounded-lg border bg-surface transition ${
+        active ? "border-accent ring-1 ring-accent" : "border-border"
+      } ${onSelect ? "cursor-pointer hover:border-fg/30" : ""}`}
       onClick={onSelect ? () => onSelect(property.id) : undefined}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -54,15 +54,15 @@ export function PropertyCard({ property, active, onSelect }: PropertyCardProps) 
       />
       <div className="space-y-1 p-3">
         <div className="flex items-baseline justify-between gap-2">
-          <p className="font-semibold">{CAD.format(property.rent)}/mo</p>
-          <span className="text-xs uppercase tracking-wide text-gray-500">
+          <p className="font-semibold text-fg">{CAD.format(property.rent)}/mo</p>
+          <span className="text-xs uppercase tracking-wide text-muted">
             {property.propertyType}
           </span>
         </div>
-        <p className="text-sm text-gray-700">
+        <p className="text-sm text-fg/80">
           {bedroomLabel(property.bedrooms)} · {property.bathrooms} ba · {property.squareFeet} sqft
         </p>
-        <p className="truncate text-sm text-gray-600">
+        <p className="truncate text-sm text-muted">
           {property.street}, {property.city}
         </p>
       </div>

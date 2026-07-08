@@ -5,7 +5,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { Map as MaplibreMap } from "maplibre-gl";
 import { Map, Marker, Popup } from "react-map-gl/maplibre";
 import { formatCompactRent } from "@/lib/format";
-import { PropertyCard } from "./PropertyCard";
+import { PropertyCard } from "@/components/property/PropertyCard";
 import type { MapPanelProps } from "./MapPanel";
 
 // Roughly centers the four seeded cities (Vancouver, Richmond, Burnaby,
@@ -50,7 +50,7 @@ export function MapInner({ properties, activeId, onSelect, onBoundsChange }: Map
   const activeProperty = properties.find((p) => p.id === activeId);
 
   return (
-    <div className="h-[70vh] w-full overflow-hidden rounded-lg border border-gray-200 sm:h-[420px] lg:h-full">
+    <div className="h-[70vh] w-full overflow-hidden rounded-lg border border-border sm:h-[420px] lg:h-full">
       {/*
         No minZoom/maxBounds: the user can pan and zoom out as far as MapLibre
         allows (the whole world). The server's fan-out guard
@@ -122,7 +122,7 @@ export function MapInner({ properties, activeId, onSelect, onBoundsChange }: Map
                   "transition-all duration-200 ease-out",
                   expanded ? "h-7 max-w-20 px-2 py-1" : "h-3 max-w-3 px-0 py-0",
                   hovered ? "scale-110 shadow-xl" : "scale-100 shadow",
-                  active ? "border-black bg-black text-white" : "border-gray-300 bg-white text-gray-900"
+                  active ? "border-accent bg-accent text-accent-fg" : "border-border bg-surface text-fg"
                 ].join(" ")}
               >
                 <span className={`transition-opacity duration-200 ${expanded ? "opacity-100" : "opacity-0"}`}>

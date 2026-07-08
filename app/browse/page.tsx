@@ -3,10 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { fetchProperties } from "@/lib/api";
 import type { Property, PropertyFilter } from "@/lib/types";
-import { FilterPillBar } from "@/components/FilterPillBar";
-import { PropertyCard } from "@/components/PropertyCard";
-import { MapPanel } from "@/components/MapPanel";
-import { MobileViewToggle } from "@/components/MobileViewToggle";
+import { FilterBar } from "@/components/filters/FilterBar";
+import { countActiveFilters } from "@/components/filters/filterOptions";
+import { PropertyCard } from "@/components/property/PropertyCard";
+import { MapPanel } from "@/components/map/MapPanel";
+import { MobileViewToggle } from "@/components/map/MobileViewToggle";
+import { Button } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PropertyCardSkeleton } from "@/components/ui/Skeleton";
 
 type LoadState = "loading" | "error" | "ready";
 
@@ -86,57 +90,77 @@ export default function BrowsePage() {
     }
   }, [properties, activeId]);
 
+  const hasActiveFilters = countActiveFilters(filter) > 0;
+
   return (
     <section className="space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold">Browse rentals</h1>
-        <p className="text-sm text-gray-600">
+        <h1 className="text-2xl font-semibold tracking-tight">Browse rentals</h1>
+        <p className="text-sm text-muted">
           Rental listings across Metro Vancouver. Pan the map or adjust the
           filters — the list and map always show the same results.
         </p>
       </div>
 
       {/*
-        Property-type pills apply instantly. "Price" and "Bd/Ba" each open a
-        small quick-access popover for just that dimension; "Filters" opens
-        the master panel bundling rent range and bedrooms/bathrooms together.
-        All of them write to the same filter state, so every surface agrees.
+        Every filter is a FilterMenu (the master "Filters" chip too) and applies
+        instantly. All write to the same filter state, so every surface agrees.
       */}
-      <FilterPillBar filter={filter} onChange={setFilter} />
+      <FilterBar filter={filter} onChange={setFilter} />
 
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[1fr_1.2fr]">
         <div className={`space-y-3 order-2 lg:order-none ${mobileView === "list" ? "" : "hidden"} sm:block`}>
           {state === "loading" ? (
-            <p className="text-sm text-gray-600">Loading listings…</p>
+            <div className="grid gap-3 sm:grid-cols-2" aria-busy="true" aria-label="Loading listings">
+              {Array.from({ length: 6 }, (_, i) => (
+                <PropertyCardSkeleton key={i} />
+              ))}
+            </div>
           ) : null}
 
           {state === "error" ? (
-            <p className="text-sm text-red-700">Could not load listings: {error}</p>
+            <EmptyState
+              tone="danger"
+              title="Couldn't load listings"
+              description={error}
+            />
           ) : null}
 
           {state === "ready" ? (
             <>
-              <div className="flex items-baseline justify-between text-sm text-gray-600">
+              <div className="flex items-baseline justify-between text-sm text-muted">
                 <span>
                   {properties.length} listing{properties.length === 1 ? "" : "s"} in view
-                  {truncated ? (
-                    <span className="text-gray-500"> — zoom in to see all</span>
-                  ) : null}
+                  {truncated ? <span className="text-muted"> — zoom in to see all</span> : null}
                 </span>
                 <span
                   aria-live="polite"
-                  className={`text-xs ${isFetching ? "text-gray-500" : "invisible"}`}
+                  className={`text-xs ${isFetching ? "text-muted" : "invisible"}`}
                 >
                   Updating…
                 </span>
               </div>
 
               {error ? (
-                <p className="text-sm text-red-700">Could not update listings: {error}</p>
+                <p className="text-sm text-danger">Could not update listings: {error}</p>
               ) : null}
 
               {properties.length === 0 ? (
-                <p className="text-sm text-gray-600">No listings match your search.</p>
+                <EmptyState
+                  title="No listings match your search"
+                  description={
+                    hasActiveFilters
+                      ? "Try widening your filters or panning the map."
+                      : "Pan or zoom the map to explore other areas."
+                  }
+                  action={
+                    hasActiveFilters ? (
+                      <Button variant="ghost" size="sm" onClick={() => setFilter({})}>
+                        Clear all filters
+                      </Button>
+                    ) : undefined
+                  }
+                />
               ) : (
                 <div className="grid gap-3 sm:grid-cols-2">
                   {properties.map((property) => (
