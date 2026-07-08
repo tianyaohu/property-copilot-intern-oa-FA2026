@@ -30,7 +30,8 @@ function toQueryString(filter: PropertyFilter, bbox?: string): string {
   if (filter.bedrooms !== undefined) params.set("bedrooms", String(filter.bedrooms));
   if (filter.bedroomsExact) params.set("bedroomsExact", "true");
   if (filter.bathrooms !== undefined) params.set("bathrooms", String(filter.bathrooms));
-  if (filter.propertyType !== undefined) params.set("propertyType", filter.propertyType);
+  // Multiple types ride on one comma-separated param; the backend splits it.
+  if (filter.propertyTypes?.length) params.set("propertyType", filter.propertyTypes.join(","));
   const query = params.toString();
   return query ? `?${query}` : "";
 }

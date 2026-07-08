@@ -74,10 +74,25 @@ describe("filterProperties", () => {
     expect(result.map((p) => p.id)).toEqual(["two-bath", "three-bath"]);
   });
 
-  test("property type matches exactly", () => {
-    const result = filterProperties(PROPERTIES, { propertyType: "condo" });
+  test("a single property type matches exactly that type", () => {
+    const result = filterProperties(PROPERTIES, { propertyTypes: ["condo"] });
     expect(result.length).toBeGreaterThan(0);
     expect(result.every((p) => p.propertyType === "condo")).toBe(true);
+  });
+
+  test("multiple property types match any of the selected types (OR)", () => {
+    const result = filterProperties(PROPERTIES, { propertyTypes: ["condo", "house"] });
+    const condoOnly = filterProperties(PROPERTIES, { propertyTypes: ["condo"] });
+    const houseOnly = filterProperties(PROPERTIES, { propertyTypes: ["house"] });
+    expect(result.length).toBe(condoOnly.length + houseOnly.length);
+    expect(result.every((p) => p.propertyType === "condo" || p.propertyType === "house")).toBe(true);
+    // Both types are actually represented, so this is a real union, not a subset.
+    expect(result.some((p) => p.propertyType === "condo")).toBe(true);
+    expect(result.some((p) => p.propertyType === "house")).toBe(true);
+  });
+
+  test("an empty property-type list constrains nothing", () => {
+    expect(filterProperties(PROPERTIES, { propertyTypes: [] })).toHaveLength(PROPERTIES.length);
   });
 
   test("filters compose: combining rent and bedrooms narrows the result", () => {
@@ -109,11 +124,26 @@ describe("parseFilter", () => {
         bathrooms: "2",
         propertyType: "house"
       })
-    ).toEqual({ minRent: 1500, maxRent: 3000, bedrooms: 2, bathrooms: 2, propertyType: "house" });
+    ).toEqual({ minRent: 1500, maxRent: 3000, bedrooms: 2, bathrooms: 2, propertyTypes: ["house"] });
   });
 
-  test("ignores invalid property type and absent fields", () => {
+  test("parses a comma-separated list of property types", () => {
+    expect(parseFilter({ propertyType: "apartment,condo" })).toEqual({
+      propertyTypes: ["apartment", "condo"]
+    });
+    // Whitespace around entries is tolerated.
+    expect(parseFilter({ propertyType: "apartment, house" })).toEqual({
+      propertyTypes: ["apartment", "house"]
+    });
+  });
+
+  test("drops invalid entries from the property-type list, keeping the valid ones", () => {
+    expect(parseFilter({ propertyType: "castle,condo" })).toEqual({ propertyTypes: ["condo"] });
+  });
+
+  test("ignores an all-invalid property type and absent fields", () => {
     expect(parseFilter({ propertyType: "castle" })).toEqual({});
+    expect(parseFilter({ propertyType: "" })).toEqual({});
     expect(parseFilter({})).toEqual({});
   });
 
@@ -169,7 +199,7 @@ describe("validateFilter", () => {
 
   test("allows a fully valid filter", () => {
     expect(
-      validateFilter({ minRent: 1500, maxRent: 3000, bedrooms: 2, bathrooms: 1, propertyType: "house" })
+      validateFilter({ minRent: 1500, maxRent: 3000, bedrooms: 2, bathrooms: 1, propertyTypes: ["house"] })
     ).toBeNull();
   });
 

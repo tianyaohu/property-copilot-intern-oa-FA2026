@@ -43,5 +43,5 @@ export type PropertyFilter = {
   bedrooms?: number; // minimum number of bedrooms, or exact count when bedroomsExact is true
   bedroomsExact?: boolean;
   bathrooms?: number; // minimum number of bathrooms
-  propertyType?: PropertyType;
+  propertyTypes?: PropertyType[]; // match any of these types; empty/absent = all
 };

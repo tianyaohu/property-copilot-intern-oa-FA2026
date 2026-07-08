@@ -1,4 +1,6 @@
-import type { Property, PropertyFilter } from "./types";
+import type { Property, PropertyFilter, PropertyType } from "./types";
+
+const PROPERTY_TYPES: readonly PropertyType[] = ["apartment", "condo", "house", "townhouse"];
 
 /**
  * Apply renter filters to a list of properties. Pure and side-effect free so it
@@ -7,7 +9,7 @@ import type { Property, PropertyFilter } from "./types";
  * Filters compose: every provided constraint must hold for an item to pass.
  * Rent is an inclusive range; bathrooms is an inclusive minimum; bedrooms is
  * an inclusive minimum by default, or an exact match when bedroomsExact is
- * set; property type matches exactly.
+ * set; property type matches any of the selected types (empty/absent = all).
  */
 export function filterProperties(properties: Property[], filter: PropertyFilter): Property[] {
   return properties.filter((property) => {
@@ -28,7 +30,7 @@ export function filterProperties(properties: Property[], filter: PropertyFilter)
     if (filter.bathrooms !== undefined && property.bathrooms < filter.bathrooms) {
       return false;
     }
-    if (filter.propertyType !== undefined && property.propertyType !== filter.propertyType) {
+    if (filter.propertyTypes?.length && !filter.propertyTypes.includes(property.propertyType)) {
       return false;
     }
     return true;
@@ -100,13 +102,16 @@ export function parseFilter(query: Record<string, string | undefined>): Property
   const bathrooms = parseNumber(query.bathrooms);
   if (bathrooms !== undefined) filter.bathrooms = bathrooms;
 
-  if (
-    query.propertyType === "apartment" ||
-    query.propertyType === "condo" ||
-    query.propertyType === "house" ||
-    query.propertyType === "townhouse"
-  ) {
-    filter.propertyType = query.propertyType;
+  // Comma-separated list of types; keep only the valid enum values, drop the
+  // rest (an unknown type is ignored, not rejected — same as a bad number).
+  if (query.propertyType !== undefined) {
+    const types = query.propertyType
+      .split(",")
+      .map((raw) => raw.trim())
+      .filter((raw): raw is PropertyType => PROPERTY_TYPES.includes(raw as PropertyType));
+    if (types.length > 0) {
+      filter.propertyTypes = types;
+    }
   }
 
   return filter;

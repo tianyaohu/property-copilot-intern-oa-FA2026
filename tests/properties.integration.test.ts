@@ -141,6 +141,16 @@ describe.runIf(!!ENDPOINT)("GET /properties (integration, DynamoDB Local)", () =
     expect(ids(res.body.properties)).toEqual(["dt-pricey", "kits", "richmond"]);
   });
 
+  it("filters by a comma-separated property-type list", async () => {
+    // Only surrey is a house; the rest are apartments.
+    const houses = await getProperties({ bbox: METRO_BBOX, propertyType: "house" });
+    expect(ids(houses.body.properties)).toEqual(["surrey"]);
+
+    // apartment,house is the union — every fixture qualifies.
+    const both = await getProperties({ bbox: METRO_BBOX, propertyType: "apartment,house" });
+    expect(both.body.count).toBe(FIXTURES.length);
+  });
+
   it("returns everything in a metro-wide box, unclipped by the result cap", async () => {
     const res = await getProperties({ bbox: METRO_BBOX });
     expect(res.body.count).toBe(FIXTURES.length);
