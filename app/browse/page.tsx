@@ -6,6 +6,7 @@ import type { Property, PropertyFilter } from "@/lib/types";
 import { FilterPillBar } from "@/components/FilterPillBar";
 import { PropertyCard } from "@/components/PropertyCard";
 import { MapPanel } from "@/components/MapPanel";
+import { MobileViewToggle } from "@/components/MobileViewToggle";
 
 type LoadState = "loading" | "error" | "ready";
 
@@ -18,6 +19,7 @@ export default function BrowsePage() {
   const [state, setState] = useState<LoadState>("loading");
   const [error, setError] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [mobileView, setMobileView] = useState<"map" | "list">("map");
   // Map viewport as "minLat,minLng,maxLat,maxLng". null until the map mounts
   // and reports its first bounds — nothing is fetched before that, so the map
   // must render regardless of load state (it produces the query, not just
@@ -102,8 +104,8 @@ export default function BrowsePage() {
       */}
       <FilterPillBar filter={filter} onChange={setFilter} />
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_1.2fr]">
-        <div className="space-y-3">
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[1fr_1.2fr]">
+        <div className={`space-y-3 order-2 lg:order-none ${mobileView === "list" ? "" : "hidden"} sm:block`}>
           {state === "loading" ? (
             <p className="text-sm text-gray-600">Loading listings…</p>
           ) : null}
@@ -151,7 +153,7 @@ export default function BrowsePage() {
           ) : null}
         </div>
 
-        <div className="lg:sticky lg:top-4 lg:h-[calc(100vh-6rem)]">
+        <div className={`order-1 lg:order-none ${mobileView === "map" ? "" : "hidden"} sm:block lg:sticky lg:top-4 lg:h-[calc(100vh-6rem)]`}>
           <MapPanel
             properties={properties}
             activeId={activeId}
@@ -160,6 +162,8 @@ export default function BrowsePage() {
           />
         </div>
       </div>
+
+      <MobileViewToggle value={mobileView} onChange={setMobileView} />
     </section>
   );
 }

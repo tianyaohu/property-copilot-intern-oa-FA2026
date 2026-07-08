@@ -23,7 +23,7 @@ export default function RootLayout({
             <Link href="/browse">Browse</Link>
           </nav>
         </header>
-        <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
+        <main className="px-4 py-8">{children}</main>
       </body>
     </html>
   );

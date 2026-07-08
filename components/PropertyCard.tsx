@@ -11,7 +11,7 @@ function bedroomLabel(bedrooms: number): string {
 type PropertyCardProps = {
   property: Property;
   active?: boolean;
-  onSelect?: (id: string) => void;
+  onSelect?: (id: string | null) => void;
 };
 
 /**

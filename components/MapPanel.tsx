@@ -6,7 +6,7 @@ import type { Property } from "@/lib/types";
 export type MapPanelProps = {
   properties: Property[];
   activeId?: string | null;
-  onSelect?: (id: string) => void;
+  onSelect?: (id: string | null) => void;
   /** Called with "minLat,minLng,maxLat,maxLng" on mount and after every pan/zoom. */
   onBoundsChange?: (bbox: string) => void;
 };
@@ -23,7 +23,7 @@ export type MapPanelProps = {
 const MapInner = dynamic(() => import("./MapInner").then((mod) => mod.MapInner), {
   ssr: false,
   loading: () => (
-    <div className="flex h-[420px] w-full items-center justify-center rounded-lg border border-gray-200 bg-gray-50 lg:h-full">
+    <div className="flex h-[70vh] w-full items-center justify-center rounded-lg border border-gray-200 bg-gray-50 sm:h-[420px] lg:h-full">
       <p className="text-sm text-gray-500">Loading map…</p>
     </div>
   )

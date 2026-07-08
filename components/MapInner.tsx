@@ -3,8 +3,9 @@
 import { useState } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { Map as MaplibreMap } from "maplibre-gl";
-import { Map, Marker } from "react-map-gl/maplibre";
+import { Map, Marker, Popup } from "react-map-gl/maplibre";
 import { CAD, formatCompactRent } from "@/lib/format";
+import { PropertyCard } from "./PropertyCard";
 import type { MapPanelProps } from "./MapPanel";
 
 // Roughly centers the four seeded cities (Vancouver, Richmond, Burnaby,
@@ -46,9 +47,10 @@ function serializeBounds(map: MaplibreMap): string {
 export function MapInner({ properties, activeId, onSelect, onBoundsChange }: MapPanelProps) {
   const [isCircleZoom, setIsCircleZoom] = useState(INITIAL_VIEW_STATE.zoom < CIRCLE_ZOOM_THRESHOLD);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const activeProperty = properties.find((p) => p.id === activeId);
 
   return (
-    <div className="h-[420px] w-full overflow-hidden rounded-lg border border-gray-200 lg:h-full">
+    <div className="h-[70vh] w-full overflow-hidden rounded-lg border border-gray-200 sm:h-[420px] lg:h-full">
       {/*
         No minZoom/maxBounds: the user can pan and zoom out as far as MapLibre
         allows (the whole world). The server's fan-out guard
@@ -63,6 +65,7 @@ export function MapInner({ properties, activeId, onSelect, onBoundsChange }: Map
         style={{ width: "100%", height: "100%" }}
         onLoad={(e) => onBoundsChange?.(serializeBounds(e.target))}
         onMoveEnd={(e) => onBoundsChange?.(serializeBounds(e.target))}
+        onDragStart={() => onSelect?.(null)}
         onZoom={(e) => {
           // Fires only on zoom gestures, not pure pans, so panning within
           // the same zoom mode doesn't re-render all markers. Only touches
@@ -130,6 +133,26 @@ export function MapInner({ properties, activeId, onSelect, onBoundsChange }: Map
             </Marker>
           );
         })}
+        {activeProperty && (
+          // No fixed `anchor`: MapLibre picks the anchor (top/bottom/left/right,
+          // or a corner combo) that keeps the popup inside the map's own
+          // rendered bounds, flipping it away from whichever edge the pin is
+          // near instead of letting it clip against the container's
+          // overflow-hidden border.
+          <Popup
+            longitude={activeProperty.lng}
+            latitude={activeProperty.lat}
+            offset={20}
+            closeButton={false}
+            closeOnClick
+            onClose={() => onSelect?.(null)}
+            className="property-popup"
+          >
+            <div className="w-64">
+              <PropertyCard property={activeProperty} active onSelect={onSelect} />
+            </div>
+          </Popup>
+        )}
       </Map>
     </div>
   );
