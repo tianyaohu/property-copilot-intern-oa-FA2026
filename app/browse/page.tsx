@@ -105,8 +105,12 @@ export default function BrowsePage() {
       {/*
         Every filter is a FilterMenu (the master "Filters" chip too) and applies
         instantly. All write to the same filter state, so every surface agrees.
+        Sticky (bg-bg masks the list scrolling under it) so filters stay
+        reachable while the listing column scrolls; the map column pins below it.
       */}
-      <FilterBar filter={filter} onChange={setFilter} />
+      <div className="sticky top-0 z-20 bg-bg py-2">
+        <FilterBar filter={filter} onChange={setFilter} />
+      </div>
 
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[1fr_1.2fr]">
         <div className={`space-y-3 order-2 lg:order-none ${mobileView === "list" ? "" : "hidden"} sm:block`}>
@@ -177,7 +181,7 @@ export default function BrowsePage() {
           ) : null}
         </div>
 
-        <div className={`order-1 lg:order-none ${mobileView === "map" ? "" : "hidden"} sm:block lg:sticky lg:top-4 lg:h-[calc(100vh-6rem)]`}>
+        <div className={`order-1 lg:order-none ${mobileView === "map" ? "" : "hidden"} sm:block lg:sticky lg:top-16 lg:h-[calc(100vh-6rem)]`}>
           <MapPanel
             properties={properties}
             activeId={activeId}
