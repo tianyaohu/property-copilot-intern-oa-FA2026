@@ -14,13 +14,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>
-        <header className="border-b bg-white">
-          <nav className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3 text-sm">
-            <Link className="font-semibold" href="/">
+      <body className="min-h-screen font-sans antialiased">
+        <header className="border-b border-border bg-surface">
+          <nav className="mx-auto flex max-w-6xl items-center gap-5 px-4 py-3 text-sm">
+            <Link className="font-semibold tracking-tight" href="/">
               Property Copilot
             </Link>
-            <Link href="/browse">Browse</Link>
+            <Link className="text-muted transition-colors hover:text-fg" href="/browse">
+              Browse
+            </Link>
           </nav>
         </header>
         <main className="px-4 py-8">{children}</main>
