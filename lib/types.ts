@@ -24,11 +24,8 @@ export type Property = {
   createdAt: string;
 };
 
-export type PropertyFilter = {
-  minRent?: number;
-  maxRent?: number;
-  bedrooms?: number; // minimum number of bedrooms, or exact count when bedroomsExact is true
-  bedroomsExact?: boolean;
-  bathrooms?: number; // minimum number of bathrooms
-  propertyTypes?: PropertyType[]; // match any of these types; empty/absent = all
-};
+// PropertyFilter has a single definition (backend/src/types.ts), re-exported
+// here so the frontend imports it from @/lib/types like every other shared
+// type. `export type` is erased at build time, so this pulls no backend code
+// into the browser bundle. Property/PropertyType/City stay mirrored above.
+export type { PropertyFilter } from "@/backend/src/types";

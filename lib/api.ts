@@ -1,3 +1,4 @@
+import { serializeFilter } from "@/backend/src/filter";
 import type { Property, PropertyFilter } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
@@ -23,15 +24,12 @@ async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
 }
 
 function toQueryString(filter: PropertyFilter, bbox?: string): string {
+  // Filter params come from the shared registry (serializeFilter is the exact
+  // inverse of the backend's parseFilter); bbox is a viewport concern, not a
+  // filter, so it's set here and kept first for readable URLs.
   const params = new URLSearchParams();
   if (bbox !== undefined) params.set("bbox", bbox);
-  if (filter.minRent !== undefined) params.set("minRent", String(filter.minRent));
-  if (filter.maxRent !== undefined) params.set("maxRent", String(filter.maxRent));
-  if (filter.bedrooms !== undefined) params.set("bedrooms", String(filter.bedrooms));
-  if (filter.bedroomsExact) params.set("bedroomsExact", "true");
-  if (filter.bathrooms !== undefined) params.set("bathrooms", String(filter.bathrooms));
-  // Multiple types ride on one comma-separated param; the backend splits it.
-  if (filter.propertyTypes?.length) params.set("propertyType", filter.propertyTypes.join(","));
+  serializeFilter(filter).forEach((value, key) => params.set(key, value));
   const query = params.toString();
   return query ? `?${query}` : "";
 }
