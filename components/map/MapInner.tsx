@@ -44,6 +44,20 @@ function serializeBounds(map: MaplibreMap): string {
   return `${south},${west},${north},${east}`;
 }
 
+// True once the map's canvas has an actual laid-out size. On mobile, the map
+// panel is toggled with Tailwind's `hidden` (display:none) rather than
+// unmounted, so it stays mounted while off-screen. When it collapses to
+// 0x0, MapLibre's canvas resets its drawing-buffer to an internal 400x300
+// fallback and still fires moveend — getBounds() then reflects that bogus
+// 400x300 viewport at the current center/zoom, not the real (now invisible)
+// one, and would otherwise push a meaningless bbox into the viewport query.
+// clientWidth/clientHeight are the real CSS-rendered size (always 0 while
+// hidden), unlike the canvas's width/height attributes.
+function hasRenderedSize(map: MaplibreMap): boolean {
+  const canvas = map.getCanvas();
+  return canvas.clientWidth > 0 && canvas.clientHeight > 0;
+}
+
 export function MapInner({ properties, activeId, onSelect, onBoundsChange }: MapPanelProps) {
   const [isCircleZoom, setIsCircleZoom] = useState(INITIAL_VIEW_STATE.zoom < CIRCLE_ZOOM_THRESHOLD);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -63,8 +77,8 @@ export function MapInner({ properties, activeId, onSelect, onBoundsChange }: Map
         initialViewState={INITIAL_VIEW_STATE}
         mapStyle={MAP_STYLE_URL}
         style={{ width: "100%", height: "100%" }}
-        onLoad={(e) => onBoundsChange?.(serializeBounds(e.target))}
-        onMoveEnd={(e) => onBoundsChange?.(serializeBounds(e.target))}
+        onLoad={(e) => hasRenderedSize(e.target) && onBoundsChange?.(serializeBounds(e.target))}
+        onMoveEnd={(e) => hasRenderedSize(e.target) && onBoundsChange?.(serializeBounds(e.target))}
         onDragStart={() => onSelect?.(null)}
         onZoom={(e) => {
           // Fires only on zoom gestures, not pure pans, so panning within
