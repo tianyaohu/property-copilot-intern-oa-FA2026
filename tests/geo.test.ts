@@ -85,6 +85,22 @@ describe('parseBoundingBox', () => {
     expect(parseBoundingBox({ bbox: '10,0,0,10' })).toBeNull();
   });
 
+  it("parses an antimeridian crossing (minLng > maxLng) instead of rejecting it", () => {
+    // Standard bbox convention: longitude may wrap. minLng > maxLng means the
+    // box crosses the date line, not that the caller swapped the edges.
+    expect(parseBoundingBox({ bbox: "10,170,20,-160" })).toEqual({
+      minLat: 10,
+      minLng: 170,
+      maxLat: 20,
+      maxLng: -160
+    });
+  });
+
+  it("still rejects a crossing whose longitude is outside ±180", () => {
+    // 200 is not a wrapped edge; only values inside ±180 may form a crossing.
+    expect(parseBoundingBox({ bbox: "10,200,20,-170" })).toBeNull();
+  });
+
   it('returns null when a component is empty instead of coercing it to 0', () => {
     // Number("") === 0 is finite, so without an explicit guard "0,,1,1"
     // would silently parse as minLng: 0.
@@ -129,9 +145,39 @@ describe("fan-out guard", () => {
   const WORLD_BOX: BoundingBox = { minLat: -89, minLng: -179, maxLat: 89, maxLng: 179 };
 
   test("estimatePrefixCount upper-bounds the real cell count", () => {
-    for (const box of [VANCOUVER_BOX, WIDE_METRO_BOX]) {
+    // The date-line box is only a degree or so wide, but it wraps: 179.5°E
+    // across to 179.5°W. The guard has to count both sides.
+    const DATE_LINE_BOX: BoundingBox = {
+      minLat: 15,
+      minLng: 179.5,
+      maxLat: 15.2,
+      maxLng: -179.5
+    };
+    for (const box of [VANCOUVER_BOX, WIDE_METRO_BOX, DATE_LINE_BOX]) {
       expect(estimatePrefixCount(box)).toBeGreaterThanOrEqual(boundingBoxPrefixes(box).length);
+      expect(estimatePrefixCount(box)).toBeGreaterThan(0);
     }
+  });
+
+  test("a date-line viewport covers cells on both sides and not the gap", () => {
+    const box: BoundingBox = { minLat: 15, minLng: 179.5, maxLat: 15.2, maxLng: -179.5 };
+    const prefixes = boundingBoxPrefixes(box);
+    expect(prefixes).toContain(geohashPrefix(encodeGeohash(15.1, 179.8)));
+    expect(prefixes).toContain(geohashPrefix(encodeGeohash(15.1, -179.8)));
+    expect(prefixes).not.toContain(geohashPrefix(encodeGeohash(15.1, 0)));
+    expect(isInBoundingBox(15.1, 179.8, box)).toBe(true);
+    expect(isInBoundingBox(15.1, -179.8, box)).toBe(true);
+    expect(isInBoundingBox(15.1, 0, box)).toBe(false);
+    expect(estimatePrefixCount(box)).toBeLessThanOrEqual(MAX_PREFIXES);
+  });
+
+  test("a near-global antimeridian span is rejected before cell enumeration", async () => {
+    // East from 10° all the way around to -10° is ~340° of longitude.
+    // Counting it as a negative width (max < min) would skip the fan-out
+    // guard and either return nothing or allocate the world.
+    const box: BoundingBox = { minLat: -70, minLng: 10, maxLat: 70, maxLng: -10 };
+    expect(estimatePrefixCount(box)).toBeGreaterThan(MAX_PREFIXES);
+    await expect(queryByBoundingBox(box)).rejects.toThrow(ViewportTooLargeError);
   });
 
   test("a realistic wide metro viewport stays comfortably under the guard", () => {
