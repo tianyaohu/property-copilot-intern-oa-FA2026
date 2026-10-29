@@ -92,5 +92,15 @@ describe("parsePropertiesQuery", () => {
       ok: false,
       error: "minRent must be a finite number"
     });
+    // Same wording once the token is literally NaN or Infinity. Syntax runs
+    // before rentRangeIssue, so these stay field-level finite-number errors.
+    expect(parsePropertiesQuery({ bbox: BBOX, minRent: "NaN" })).toEqual({
+      ok: false,
+      error: "minRent must be a finite number"
+    });
+    expect(parsePropertiesQuery({ bbox: BBOX, maxRent: "Infinity" })).toEqual({
+      ok: false,
+      error: "maxRent must be a finite number"
+    });
   });
 });

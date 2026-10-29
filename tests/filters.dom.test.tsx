@@ -4,7 +4,9 @@ import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { filterProperties } from "@/backend/src/filter";
+import { serializeFilter } from "@/backend/src/filter";
 import { FilterBar } from "@/components/filters/FilterBar";
+import { PriceFilter } from "@/components/filters/PriceFilter";
 import { PropertyTypeFilter } from "@/components/filters/PropertyTypeFilter";
 import { RoomsFilter } from "@/components/filters/RoomsFilter";
 import type { PropertyFilter } from "@/lib/types";
@@ -95,6 +97,49 @@ describe("RoomsFilter studio", () => {
     expect(exact).not.toBeChecked();
     expect(exact).toBeEnabled();
     expect(screen.queryByText("Studios always match exactly.")).not.toBeInTheDocument();
+  });
+});
+
+describe("PriceFilter commit", () => {
+  function PriceHarness({ initial }: { initial: PropertyFilter }) {
+    const [filter, setFilter] = useState<PropertyFilter>(initial);
+    return (
+      <>
+        <PriceFilter filter={filter} onChange={setFilter} />
+        <output data-testid="applied">{JSON.stringify(filter)}</output>
+        <output data-testid="query">{serializeFilter(filter).toString()}</output>
+      </>
+    );
+  }
+
+  it("keeps an applied minimum when the number field is given a non-numeric value", () => {
+    render(<PriceHarness initial={{ minRent: 1500, bedrooms: 2 }} />);
+    const minimum = screen.getByLabelText("Minimum");
+
+    // <input type="number"> sanitizes "e", ".", "Infinity", and "1e309" to "".
+    // That empty string is not the user clearing the field — committing it
+    // drops minRent, and the next list request returns every in-box listing.
+    for (const value of ["e", ".", "Infinity", "1e309", "NaN", " "]) {
+      fireEvent.change(minimum, { target: { value } });
+      expect(screen.getByTestId("applied").textContent).toBe(
+        JSON.stringify({ minRent: 1500, bedrooms: 2 })
+      );
+      expect(screen.getByTestId("query").textContent).toBe("minRent=1500&bedrooms=2");
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+    }
+  });
+
+  it("still clears a bound on an empty value and still applies a finite one", () => {
+    render(<PriceHarness initial={{ minRent: 1500 }} />);
+    const minimum = screen.getByLabelText("Minimum");
+
+    fireEvent.change(minimum, { target: { value: "2400" } });
+    expect(screen.getByTestId("applied").textContent).toBe(JSON.stringify({ minRent: 2400 }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    fireEvent.change(minimum, { target: { value: "" } });
+    expect(screen.getByTestId("applied").textContent).toBe(JSON.stringify({}));
+    expect(screen.getByTestId("query").textContent).toBe("");
   });
 });
 

@@ -71,6 +71,8 @@ const rent: FilterField = {
     // filter UI. These strings are the API's stable error text; an inverted
     // range is a bad request, not "no listings" — see validateFilter below.
     const issue = rentRangeIssue(filter.minRent, filter.maxRent);
+    if (issue === "non-finite-min") return "minRent must be a finite number";
+    if (issue === "non-finite-max") return "maxRent must be a finite number";
     if (issue === "negative-min") return "minRent must be greater than or equal to 0";
     if (issue === "negative-max") return "maxRent must be greater than or equal to 0";
     if (issue === "inverted") return "minRent must not be greater than maxRent";
@@ -223,13 +225,14 @@ export function validateFilterQuery(query: Query): string | null {
 }
 
 /**
- * Validate a parsed PropertyFilter's domain rules (no negative bound, no
- * inverted rent range). Separate from validateFilterQuery, which rejects
- * non-finite raw tokens before they can be omitted. An inverted or negative
- * range fails the whole request instead of being quietly dropped, since
- * filterProperties would otherwise return an empty result that reads as
- * "no listings" rather than "bad request". Returns the first violation
- * message, or null when the filter is valid.
+ * Validate a parsed PropertyFilter's domain rules (finite rent bounds, no
+ * negative bound, no inverted rent range). Separate from validateFilterQuery,
+ * which rejects non-finite raw tokens before they can be omitted. An inverted
+ * or negative range fails the whole request instead of being quietly dropped,
+ * since filterProperties would otherwise return an empty result that reads as
+ * "no listings" rather than "bad request". A non-finite bound fails the
+ * request too: NaN passes every comparison, so the predicate would keep every
+ * listing. Returns the first violation message, or null when the filter is valid.
  */
 export function validateFilter(filter: PropertyFilter): string | null {
   for (const field of FILTER_FIELDS) {

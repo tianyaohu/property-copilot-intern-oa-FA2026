@@ -93,12 +93,26 @@ export function propertyResponse(property: Property): PropertyResponse {
  * filter so the accept/reject decision cannot drift; each side maps the issue
  * onto its own copy (stable API error text vs UI sentences).
  *
- * Order is part of the contract: a negative bound is reported before an
- * inverted range when both are wrong.
+ * Order is part of the contract: a non-finite bound is reported before a
+ * negative one, and a negative bound before an inverted range, when more
+ * than one is wrong. NaN fails every relational comparison, so without the
+ * non-finite check a NaN minimum looks like "no minimum" and matches every
+ * listing (`rent < NaN` is never true).
  */
-export type RentRangeIssue = "negative-min" | "negative-max" | "inverted";
+export type RentRangeIssue =
+  | "non-finite-min"
+  | "non-finite-max"
+  | "negative-min"
+  | "negative-max"
+  | "inverted";
+
+function isNonFiniteBound(value: number | undefined): boolean {
+  return value !== undefined && !Number.isFinite(value);
+}
 
 export function rentRangeIssue(minRent?: number, maxRent?: number): RentRangeIssue | null {
+  if (isNonFiniteBound(minRent)) return "non-finite-min";
+  if (isNonFiniteBound(maxRent)) return "non-finite-max";
   if (minRent !== undefined && minRent < 0) return "negative-min";
   if (maxRent !== undefined && maxRent < 0) return "negative-max";
   if (minRent !== undefined && maxRent !== undefined && minRent > maxRent) return "inverted";
