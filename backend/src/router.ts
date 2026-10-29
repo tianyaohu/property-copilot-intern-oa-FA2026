@@ -1,11 +1,6 @@
-import { filterProperties, parseFilter, validateFilter } from "./filter";
-import { parseBoundingBox } from "./geo";
-import {
-  capResults,
-  getPropertyById,
-  queryByBoundingBox,
-  ViewportTooLargeError
-} from "./properties";
+import { parsePropertiesQuery } from "./properties-query";
+import { getPropertyById, ViewportTooLargeError } from "./properties";
+import { searchProperties } from "./search";
 
 export type ApiRequest = {
   method: string;
@@ -20,8 +15,8 @@ export type ApiResponse = {
 
 /**
  * Framework-agnostic request router shared by the Lambda handler (production)
- * and the local dev server. Keeps the HTTP plumbing in one place so the same
- * logic runs in both environments.
+ * and the local dev server. Maps method and path onto a status and a body.
+ * Query parsing, the viewport read, and HTTP serialization live elsewhere.
  */
 export async function route(req: ApiRequest): Promise<ApiResponse> {
   if (req.method !== "GET") {
@@ -53,28 +48,17 @@ export async function route(req: ApiRequest): Promise<ApiResponse> {
   // after the geospatial query (reusing the pure logic in filter.ts), and
   // the result cap runs last so filters never lose matches to it.
   if (req.path === "/properties") {
-    if (req.query.bbox === undefined) {
-      return {
-        statusCode: 400,
-        body: { error: "bbox is required (bbox=minLat,minLng,maxLat,maxLng)" }
-      };
-    }
-    const box = parseBoundingBox(req.query);
-    if (!box) {
-      return {
-        statusCode: 400,
-        body: { error: "Invalid bbox (expected bbox=minLat,minLng,maxLat,maxLng)" }
-      };
-    }
-    const parsedFilter = parseFilter(req.query);
-    const filterError = validateFilter(parsedFilter);
-    if (filterError) {
-      return { statusCode: 400, body: { error: filterError } };
+    const parsed = parsePropertiesQuery(req.query);
+    if (!parsed.ok) {
+      return { statusCode: 400, body: { error: parsed.error } };
     }
 
-    let inView;
     try {
-      inView = await queryByBoundingBox(box);
+      const { properties, truncated } = await searchProperties(parsed.box, parsed.filter);
+      return {
+        statusCode: 200,
+        body: { properties, count: properties.length, truncated }
+      };
     } catch (err) {
       // The frontend no longer caps how far a user can pan/zoom out (no
       // minZoom, no maxBounds) — zooming out toward the whole world is a
@@ -85,12 +69,6 @@ export async function route(req: ApiRequest): Promise<ApiResponse> {
       }
       throw err;
     }
-    const filtered = filterProperties(inView, parsedFilter);
-    const { properties, truncated } = capResults(filtered);
-    return {
-      statusCode: 200,
-      body: { properties, count: properties.length, truncated }
-    };
   }
 
   return { statusCode: 404, body: { error: "Not found" } };

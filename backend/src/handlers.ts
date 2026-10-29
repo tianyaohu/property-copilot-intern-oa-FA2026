@@ -1,5 +1,4 @@
-import { CORS_HEADERS } from "./cors";
-import { route } from "./router";
+import { handleApiRequest, type HttpResult } from "./http";
 
 /**
  * Minimal shape of an API Gateway HTTP API (payload format 2.0) event. Inlined
@@ -11,40 +10,16 @@ type HttpApiEvent = {
   requestContext?: { http?: { method?: string } };
 };
 
-type HttpApiResult = {
-  statusCode: number;
-  headers: Record<string, string>;
-  body: string;
-};
-
 /**
  * AWS Lambda entry point behind API Gateway (HTTP API, payload format 2.0).
- * Delegates to the shared router so behaviour matches local dev exactly.
+ * Maps the event onto the shared request. Serialization (CORS, JSON, OPTIONS,
+ * 500) lives in handleApiRequest, which the local dev server also calls.
  */
-export async function handler(event: HttpApiEvent): Promise<HttpApiResult> {
+export async function handler(event: HttpApiEvent): Promise<HttpResult> {
   const method = event.requestContext?.http?.method ?? "GET";
-
-  if (method === "OPTIONS") {
-    return { statusCode: 204, headers: CORS_HEADERS, body: "" };
-  }
-
-  try {
-    const result = await route({
-      method,
-      path: event.rawPath ?? "/",
-      query: event.queryStringParameters ?? {}
-    });
-    return {
-      statusCode: result.statusCode,
-      headers: CORS_HEADERS,
-      body: JSON.stringify(result.body)
-    };
-  } catch (error) {
-    console.error("Unhandled error", error);
-    return {
-      statusCode: 500,
-      headers: CORS_HEADERS,
-      body: JSON.stringify({ error: "Internal server error" })
-    };
-  }
+  return handleApiRequest({
+    method,
+    path: event.rawPath ?? "/",
+    query: event.queryStringParameters ?? {}
+  });
 }

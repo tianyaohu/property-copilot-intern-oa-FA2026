@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { route } from "../backend/src/router";
-import { MAX_RESULTS, ViewportTooLargeError } from "../backend/src/properties";
+import { ViewportTooLargeError } from "../backend/src/properties";
+import { MAX_RESULTS } from "../backend/src/search";
 import type { Property } from "../backend/src/types";
 import { makeProperty as property } from "./fixtures";
 
-// Mock only the DynamoDB-backed functions; everything else (parseBoundingBox,
-// parseFilter, filterProperties, ViewportTooLargeError) runs for real, so these
-// tests exercise the router's actual branching and composition logic without a
-// database. The full stack against DynamoDB Local is covered by
-// properties.integration.test.ts.
+// Mock only the DynamoDB-backed functions. Parsing (parsePropertiesQuery) and
+// the search composition (filter, then cap) run for real, so these tests
+// exercise the router's status mapping without a database. The full stack
+// against DynamoDB Local is covered by properties.integration.test.ts.
 vi.mock("../backend/src/properties", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../backend/src/properties")>();
   return {

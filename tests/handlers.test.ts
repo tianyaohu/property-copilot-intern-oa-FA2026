@@ -2,9 +2,10 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { handler } from "../backend/src/handlers";
 import { route } from "../backend/src/router";
 
-// The Lambda adapter's job is translation, not routing: unwrap the API Gateway
-// (HTTP API v2) event, delegate to route(), wrap the result with CORS headers.
-// Mocking route() lets these tests pin that translation layer down exactly.
+// The Lambda adapter maps an API Gateway (HTTP API v2) event onto a request.
+// Serialization — CORS, JSON, OPTIONS, 500 — lives in handleApiRequest, which
+// this handler and the local dev server both call. Mocking route() pins that
+// envelope without exercising routing.
 vi.mock("../backend/src/router", () => ({ route: vi.fn() }));
 
 const routeMock = vi.mocked(route);
