@@ -81,11 +81,16 @@ describe("parsePropertiesQuery", () => {
     });
   });
 
-  test("an unparseable number is omitted rather than rejected", () => {
+  test("a non-finite number is rejected instead of being dropped", () => {
+    // `bathrooms=lots` and a comma-joined duplicate (`1000,2000`) are not
+    // finite. Omitting them would return every listing in the box.
     expect(parsePropertiesQuery({ bbox: BBOX, bathrooms: "lots" })).toEqual({
-      ok: true,
-      box: BOX,
-      filter: {}
+      ok: false,
+      error: "bathrooms must be a finite number"
+    });
+    expect(parsePropertiesQuery({ bbox: BBOX, minRent: "1000,2000", bedrooms: "0" })).toEqual({
+      ok: false,
+      error: "minRent must be a finite number"
     });
   });
 });
