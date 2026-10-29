@@ -3,11 +3,11 @@ import "@testing-library/jest-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 
-// The viewport fetch effect is the frontend's real logic: a 350ms debounce that
-// coalesces rapid pan/zoom/filter changes into one request, and an
-// AbortController that cancels the superseded request. We mock the network and
-// the WebGL map (MapLibre can't run in jsdom) and drive bounds via the mock.
-vi.mock("@/lib/api", () => ({ fetchProperties: vi.fn() }));
+// The viewport fetch effect debounces 350ms so rapid pan/zoom/filter changes
+// become one request, and aborts the superseded request. Query building and
+// the typed result live in lib/propertiesQuery; this mocks that boundary and
+// the WebGL map (MapLibre can't run in jsdom) and drives bounds via the mock.
+vi.mock("@/lib/propertiesQuery", () => ({ loadProperties: vi.fn() }));
 vi.mock("@/components/map/MapPanel", () => ({
   MapPanel: ({ onBoundsChange }: { onBoundsChange?: (bbox: string) => void }) => (
     <div>
@@ -22,9 +22,9 @@ vi.mock("@/components/map/MapPanel", () => ({
 }));
 
 import BrowsePage from "@/app/browse/page";
-import { fetchProperties } from "@/lib/api";
+import { loadProperties } from "@/lib/propertiesQuery";
 
-const fetchMock = vi.mocked(fetchProperties);
+const fetchMock = vi.mocked(loadProperties);
 const DEBOUNCE_MS = 350;
 
 beforeEach(() => {
@@ -59,7 +59,6 @@ describe("BrowsePage viewport fetching", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.anything(),
       expect.objectContaining({ bbox: "49.1,-123.1,49.2,-122.9" })
     );
   });
@@ -71,7 +70,7 @@ describe("BrowsePage viewport fetching", () => {
     await act(async () => void vi.advanceTimersByTime(DEBOUNCE_MS));
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    const firstSignal = fetchMock.mock.calls[0][1]?.signal as AbortSignal;
+    const firstSignal = fetchMock.mock.calls[0][0]?.signal as AbortSignal;
     expect(firstSignal.aborted).toBe(false);
 
     // A newer viewport supersedes the pending request; its effect cleanup aborts it.

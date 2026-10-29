@@ -194,7 +194,7 @@ export function validateFilter(filter: PropertyFilter): string | null {
 /**
  * Serialize a PropertyFilter to query params — the exact inverse of parseFilter,
  * driven by the same registry so the two can never drift. Shared with the
- * frontend API client (lib/api.ts) so the wire format has one owner.
+ * frontend properties query (lib/propertiesQuery.ts) so the wire format has one owner.
  */
 export function serializeFilter(filter: PropertyFilter): URLSearchParams {
   const params = new URLSearchParams();
