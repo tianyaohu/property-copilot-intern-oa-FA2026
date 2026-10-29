@@ -89,10 +89,16 @@ const bedrooms: FilterField = {
   },
   predicate(property, filter) {
     if (filter.bedrooms === undefined) return true;
-    // Minimum by default; exact count when bedroomsExact is set.
-    return filter.bedroomsExact
-      ? property.bedrooms === filter.bedrooms
-      : property.bedrooms >= filter.bedrooms;
+    // Studio is always exact. A minimum of 0 matches every listing (counts
+    // are never negative), and the UI labels bedrooms=0 as "Studio" — so
+    // treating it as "at least 0" makes the chip look active while the
+    // result set does not change. bedroomsExact still switches a positive
+    // count between "exactly N" and "at least N"; an explicit false does
+    // not widen studio back into a match-all.
+    if (filter.bedrooms === 0 || filter.bedroomsExact) {
+      return property.bedrooms === filter.bedrooms;
+    }
+    return property.bedrooms >= filter.bedrooms;
   },
   serialize(filter, params) {
     if (filter.bedrooms !== undefined) params.set("bedrooms", String(filter.bedrooms));

@@ -3,9 +3,12 @@ import "@testing-library/jest-dom";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { filterProperties } from "@/backend/src/filter";
 import { FilterBar } from "@/components/filters/FilterBar";
 import { PropertyTypeFilter } from "@/components/filters/PropertyTypeFilter";
+import { RoomsFilter } from "@/components/filters/RoomsFilter";
 import type { PropertyFilter } from "@/lib/types";
+import { makeProperty } from "./fixtures";
 
 // These exercise the filter UI's behaviour, which pure filter.test.ts can't:
 // that filters compose from user clicks, that property type is multi-select
@@ -52,6 +55,46 @@ describe("PropertyTypeFilter (multi-select)", () => {
     // Clearing the last type collapses back to "no type filter" (undefined -> []).
     fireEvent.click(screen.getByRole("checkbox", { name: "Condo" }));
     expect(types()).toBe("[]");
+  });
+});
+
+describe("RoomsFilter studio", () => {
+  const listings = [
+    makeProperty({ id: "studio", bedrooms: 0 }),
+    makeProperty({ id: "one-bed", bedrooms: 1 }),
+    makeProperty({ id: "four-bed", bedrooms: 4 })
+  ];
+
+  function RoomsHarness() {
+    const [filter, setFilter] = useState<PropertyFilter>({});
+    const matched = filterProperties(listings, filter).map((p) => p.id);
+    return (
+      <>
+        <RoomsFilter filter={filter} onChange={setFilter} />
+        <output data-testid="matched">{matched.join(",")}</output>
+      </>
+    );
+  }
+
+  it("clicking Studio keeps only 0-bedroom listings and shows exact match as on", () => {
+    render(<RoomsHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Studio" }));
+
+    // bedrooms=0 must not degrade into "at least 0", which matches every listing.
+    expect(screen.getByTestId("matched").textContent).toBe("studio");
+
+    const exact = screen.getByRole("checkbox", { name: "Use exact match" });
+    expect(exact).toBeChecked();
+    expect(exact).toBeDisabled();
+    expect(screen.getByText("Studios always match exactly.")).toBeInTheDocument();
+
+    // Leaving Studio restores the minimum semantics and unlocks the toggle.
+    fireEvent.click(screen.getByRole("button", { name: "2" }));
+    expect(screen.getByTestId("matched").textContent).toBe("four-bed");
+    expect(exact).not.toBeChecked();
+    expect(exact).toBeEnabled();
+    expect(screen.queryByText("Studios always match exactly.")).not.toBeInTheDocument();
   });
 });
 
