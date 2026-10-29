@@ -33,7 +33,7 @@ export function Segmented<T>({ options, value, onChange, ariaLabel }: SegmentedP
             aria-pressed={selected}
             onClick={() => onChange(option.value)}
             className={cn(
-              "min-w-11 border-r border-border px-3 py-2 text-sm font-medium transition-colors last:border-r-0",
+              "min-w-11 border-r border-border px-3 py-2 text-sm font-medium transition-colors last:border-r-0 max-sm:min-h-11",
               selected ? "bg-accent text-accent-fg" : "bg-surface text-fg hover:bg-fg/5"
             )}
           >
