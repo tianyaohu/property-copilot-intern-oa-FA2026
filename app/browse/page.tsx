@@ -182,6 +182,8 @@ export default function BrowsePage() {
                       property={property}
                       active={property.id === activeId}
                       onSelect={setActiveId}
+                      syncWithList
+                      layoutKey={mobileView}
                     />
                   ))}
                 </div>
