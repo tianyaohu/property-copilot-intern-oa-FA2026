@@ -12,6 +12,17 @@ type PropertyCardProps = {
   property: Property;
   active?: boolean;
   onSelect?: (id: string | null) => void;
+  /**
+   * List cards only. The map popup uses the same tile and must not scroll
+   * the page when it opens.
+   */
+  syncWithList?: boolean;
+  /**
+   * Changes when the phone swaps map and list. The list is `display: none`
+   * while the map is showing, so a scroll started at selection time has no
+   * box to move — this key retries once the list is actually on screen.
+   */
+  layoutKey?: string;
 };
 
 /**
@@ -19,23 +30,43 @@ type PropertyCardProps = {
  * and the map popup; the active state (accent ring) marks the selected marker's
  * card.
  */
-export function PropertyCard({ property, active, onSelect }: PropertyCardProps) {
+export function PropertyCard({ property, active, onSelect, syncWithList, layoutKey }: PropertyCardProps) {
   const ref = useRef<HTMLElement>(null);
+  const layoutKeyRef = useRef(layoutKey);
+  // Set during render when the phone list is being revealed, so the effect
+  // centers the already-selected card instead of treating it as a no-op.
+  const centerOnShow = useRef(false);
+  if (layoutKeyRef.current !== layoutKey) {
+    centerOnShow.current = layoutKey === "list";
+    layoutKeyRef.current = layoutKey;
+  }
 
-  // Map → list sync: when this card becomes active (its marker was clicked),
-  // bring it into view. "nearest" makes it a no-op if already visible.
-  // Skipped between `sm` and `lg`: at that width, map and list are stacked
-  // in one column with no sticky map (that only starts at `lg`), so
-  // scrolling to the card yanks the map the user just clicked clean off
-  // screen. Below `sm` the list is hidden while map view is active (nothing
-  // visible to scroll to); at `lg`+ the sticky map stays in view beside the
-  // list, so the scroll there is harmless.
+  // Map → list sync. "nearest" is a no-op when the card is already visible.
+  // Opening the phone list is different: the selection happened while this
+  // card was display:none, so the earlier scroll never landed — center it
+  // once it has a box. Skipped between `sm` and `lg`: map and list are
+  // stacked with no sticky map, and scrolling the page would yank the map
+  // the user just clicked off screen. At `lg`+ the map stays sticky.
   useEffect(() => {
-    if (!active) return;
+    const el = ref.current;
+    const laidOut = !!el && el.getClientRects().length > 0;
+    if (!syncWithList || !active || !laidOut || !el) {
+      // Consume a pending reveal when there is nothing selected to show.
+      // Leave it pending while the selected card is still display:none so
+      // the next layout (the list opening) can still center it.
+      if (!active || laidOut) centerOnShow.current = false;
+      return;
+    }
+    const center = centerOnShow.current;
+    centerOnShow.current = false;
     const isStackedNarrow = window.matchMedia("(min-width: 640px) and (max-width: 1023.98px)").matches;
     if (isStackedNarrow) return;
-    ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [active]);
+    el.scrollIntoView(
+      center
+        ? { block: "center", inline: "nearest", behavior: "smooth" }
+        : { block: "nearest", behavior: "smooth" }
+    );
+  }, [syncWithList, active, layoutKey]);
 
   return (
     <article
