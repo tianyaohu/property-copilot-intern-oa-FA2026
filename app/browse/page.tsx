@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { fetchProperties } from "@/lib/api";
+import { loadProperties } from "@/lib/propertiesQuery";
 import type { Property, PropertyFilter } from "@/lib/types";
 import { FilterBar } from "@/components/filters/FilterBar";
 import { countActiveFilters } from "@/components/filters/filterOptions";
@@ -51,20 +51,29 @@ export default function BrowsePage() {
       abortRef.current = controller;
       setIsFetching(true);
 
-      fetchProperties(filter, { bbox, signal: controller.signal })
-        .then((data) => {
-          setProperties(data.properties);
-          setTruncated(data.truncated);
+      // Query string, the missing-viewport skip, abort, and error text live in
+      // loadProperties. This effect only debounces and maps the result onto
+      // view state.
+      loadProperties({ filter, bbox, signal: controller.signal })
+        .then((result) => {
+          if (
+            controller.signal.aborted ||
+            result.status === "aborted" ||
+            result.status === "cancelled"
+          ) {
+            return;
+          }
+          if (result.status === "error") {
+            setError(result.message);
+            // Only the first load gets the full-page error state; once listings
+            // are on screen, keep them and surface the failure inline.
+            setState((prev) => (prev === "ready" ? prev : "error"));
+            return;
+          }
+          setProperties(result.properties);
+          setTruncated(result.truncated);
           setState("ready");
           setError("");
-        })
-        .catch((err) => {
-          // A request superseded by a newer viewport aborts; not an error.
-          if ((err as Error)?.name === "AbortError") return;
-          setError(err instanceof Error ? err.message : "Failed to load listings");
-          // Only the first load gets the full-page error state; once listings
-          // are on screen, keep them and surface the failure inline.
-          setState((prev) => (prev === "ready" ? prev : "error"));
         })
         .finally(() => {
           if (abortRef.current === controller) {
