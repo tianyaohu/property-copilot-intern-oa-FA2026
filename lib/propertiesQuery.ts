@@ -1,6 +1,6 @@
 import { serializeFilter } from "@/backend/src/filter";
 import { apiGet } from "@/lib/api";
-import type { Property, PropertyFilter } from "@/lib/types";
+import type { PropertiesListResponse, Property, PropertyFilter } from "@/lib/types";
 
 const LOAD_ERROR = "Failed to load listings";
 
@@ -42,10 +42,12 @@ function isAbortError(err: unknown): boolean {
   return (err as { name?: string } | null)?.name === "AbortError";
 }
 
-type PropertiesListBody = {
-  properties?: Property[];
-  truncated?: boolean;
-};
+/**
+ * Partial decode of the shared list body. A 200 that omits `properties` is
+ * an error; a missing `truncated` is treated as false. Field names come from
+ * PropertiesListResponse so this guard cannot drift from the wire contract.
+ */
+type PropertiesListBody = Partial<Pick<PropertiesListResponse, "properties" | "truncated">>;
 
 /**
  * Issue GET `/properties` for the current filter and viewport.

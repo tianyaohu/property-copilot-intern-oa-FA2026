@@ -1,6 +1,7 @@
 import { parsePropertiesQuery } from "./properties-query";
 import { getPropertyById, ViewportTooLargeError } from "./properties";
 import { searchProperties } from "./search";
+import { propertiesListResponse, propertyResponse } from "./types";
 
 export type ApiRequest = {
   method: string;
@@ -34,7 +35,7 @@ export async function route(req: ApiRequest): Promise<ApiResponse> {
     if (!property) {
       return { statusCode: 404, body: { error: "Property not found" } };
     }
-    return { statusCode: 200, body: { property } };
+    return { statusCode: 200, body: propertyResponse(property) };
   }
 
   // GET /properties
@@ -59,7 +60,7 @@ export async function route(req: ApiRequest): Promise<ApiResponse> {
       const { properties, truncated } = await searchProperties(parsed.box, parsed.filter);
       return {
         statusCode: 200,
-        body: { properties, count: properties.length, truncated }
+        body: propertiesListResponse(properties, truncated)
       };
     } catch (err) {
       // The frontend no longer caps how far a user can pan/zoom out (no

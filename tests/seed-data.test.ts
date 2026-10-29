@@ -2,8 +2,7 @@ import { describe, expect, test } from "vitest";
 import { generateProperties } from "../backend/src/seed-data";
 import { withGeoAttributes } from "../backend/src/properties";
 import { encodeGeohash, geohashPrefix } from "../backend/src/geo";
-
-const CITIES = ["Vancouver", "Richmond", "Burnaby", "Surrey"];
+import { CITIES } from "../shared/contract";
 
 describe("seed data", () => {
   const properties = generateProperties();

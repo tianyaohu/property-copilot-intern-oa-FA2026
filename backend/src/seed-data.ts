@@ -1,4 +1,4 @@
-import type { City, Property, PropertyType } from "./types";
+import { CITIES, PROPERTY_TYPES, type City, type Property } from "./types";
 
 export type SeedProperty = Omit<Property, "geohash" | "geohashPrefix">;
 
@@ -24,38 +24,37 @@ type CitySpec = {
 
 // Approximate city centres in Metro Vancouver. Listings are scattered around
 // each centre so they spread across the map rather than stacking on one point.
-const CITIES: CitySpec[] = [
-  {
-    name: "Vancouver",
+// Which cities exist, and the order this generator indexes, comes from the
+// shared CITIES list. That order is load-bearing: the seeded catalogue is
+// deterministic.
+const CITY_DETAILS: Record<City, Omit<CitySpec, "name">> = {
+  Vancouver: {
     lat: 49.2827,
     lng: -123.1207,
     fsa: "V6B",
     streets: ["Robson St", "Davie St", "Main St", "Cambie St", "Hastings St", "Granville St"]
   },
-  {
-    name: "Richmond",
+  Richmond: {
     lat: 49.1666,
     lng: -123.1336,
     fsa: "V6X",
     streets: ["No. 3 Rd", "Westminster Hwy", "Garden City Rd", "Granville Ave", "Cook Rd"]
   },
-  {
-    name: "Burnaby",
+  Burnaby: {
     lat: 49.2488,
     lng: -122.9805,
     fsa: "V5H",
     streets: ["Kingsway", "Willingdon Ave", "Hastings St", "Canada Way", "Lougheed Hwy"]
   },
-  {
-    name: "Surrey",
+  Surrey: {
     lat: 49.1913,
     lng: -122.849,
     fsa: "V3T",
     streets: ["King George Blvd", "Fraser Hwy", "104 Ave", "152 St", "Scott Rd"]
   }
-];
+};
 
-const PROPERTY_TYPES: PropertyType[] = ["apartment", "condo", "house", "townhouse"];
+const CITY_SPECS: CitySpec[] = CITIES.map((name) => ({ name, ...CITY_DETAILS[name] }));
 
 function postalCode(fsa: string, rng: () => number): string {
   const digit = () => Math.floor(rng() * 10);
@@ -72,7 +71,7 @@ export function generateProperties(count = 50): SeedProperty[] {
   const properties: SeedProperty[] = [];
 
   for (let i = 0; i < count; i += 1) {
-    const city = CITIES[i % CITIES.length];
+    const city = CITY_SPECS[i % CITY_SPECS.length];
     const propertyType = PROPERTY_TYPES[Math.floor(rng() * PROPERTY_TYPES.length)];
 
     // Scatter within roughly +/- 3km of the city centre.

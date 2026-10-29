@@ -1,6 +1,4 @@
-import type { Property, PropertyFilter, PropertyType } from "./types";
-
-const PROPERTY_TYPES: readonly PropertyType[] = ["apartment", "condo", "house", "townhouse"];
+import { isPropertyType, rentRangeIssue, type Property, type PropertyFilter } from "./types";
 
 type Query = Record<string, string | undefined>;
 
@@ -45,21 +43,13 @@ const rent: FilterField = {
     return patch;
   },
   validate(filter) {
-    if (filter.minRent !== undefined && filter.minRent < 0) {
-      return "minRent must be greater than or equal to 0";
-    }
-    if (filter.maxRent !== undefined && filter.maxRent < 0) {
-      return "maxRent must be greater than or equal to 0";
-    }
-    // Cross-field rule kept inside the rent dimension. An inverted range is a
-    // bad request, not "no listings" — see validateFilter's contract below.
-    if (
-      filter.minRent !== undefined &&
-      filter.maxRent !== undefined &&
-      filter.minRent > filter.maxRent
-    ) {
-      return "minRent must not be greater than maxRent";
-    }
+    // The accept/reject decision is rentRangeIssue, shared with the price
+    // filter UI. These strings are the API's stable error text; an inverted
+    // range is a bad request, not "no listings" — see validateFilter below.
+    const issue = rentRangeIssue(filter.minRent, filter.maxRent);
+    if (issue === "negative-min") return "minRent must be greater than or equal to 0";
+    if (issue === "negative-max") return "maxRent must be greater than or equal to 0";
+    if (issue === "inverted") return "minRent must not be greater than maxRent";
     return null;
   },
   predicate(property, filter) {
@@ -136,7 +126,7 @@ const propertyTypes: FilterField = {
     const types = query.propertyType
       .split(",")
       .map((raw) => raw.trim())
-      .filter((raw): raw is PropertyType => PROPERTY_TYPES.includes(raw as PropertyType));
+      .filter(isPropertyType);
     return types.length > 0 ? { propertyTypes: types } : {};
   },
   predicate(property, filter) {
@@ -152,7 +142,7 @@ const propertyTypes: FilterField = {
 
 /**
  * The filter registry — the single source of truth for every dimension. Adding
- * a filter is one entry here (plus the field on PropertyFilter in types.ts).
+ * a filter is one entry here (plus the field on PropertyFilter in shared/contract.ts).
  * Order is only observable in validateFilter (first violation wins) and matches
  * the original hand-written field order.
  */
