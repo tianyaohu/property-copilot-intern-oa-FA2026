@@ -1,10 +1,18 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Property Copilot — Map Browser",
   description: "Map-based rental browser scaffold for Metro Vancouver"
+};
+
+// `cover` is what makes env(safe-area-inset-*) non-zero on notched phones.
+// The filter sheet uses the bottom inset to clear the home indicator.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover"
 };
 
 export default function RootLayout({

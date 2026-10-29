@@ -38,7 +38,7 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(function Chip(
       <button
         type="button"
         className={cn(
-          "flex items-center gap-1.5 rounded-full py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-bg",
+          "flex items-center gap-1.5 rounded-full py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-bg max-sm:min-h-11",
           showClear ? "pl-3 pr-1.5" : "px-3"
         )}
         {...buttonProps}
@@ -50,7 +50,7 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(function Chip(
           type="button"
           aria-label="Clear filter"
           onClick={onClear}
-          className="mr-1 flex h-5 w-5 items-center justify-center rounded-full text-accent-fg/80 transition-colors hover:bg-accent-fg/20 hover:text-accent-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-fg"
+          className="mr-1 flex h-5 w-5 items-center justify-center rounded-full text-accent-fg/80 transition-colors hover:bg-accent-fg/20 hover:text-accent-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-fg max-sm:h-11 max-sm:w-11"
         >
           <svg viewBox="0 0 14 14" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M3.5 3.5l7 7M10.5 3.5l-7 7" />
