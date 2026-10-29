@@ -7,7 +7,8 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 // jsdom does not apply that CSS, so layout is simulated: an element inside
 // `.hidden` has no box, and everything else does. That is what makes
 // scrollIntoView a no-op until the user switches to the list.
-vi.mock("@/lib/api", () => ({ fetchProperties: vi.fn() }));
+// The browse page loads listings through loadProperties.
+vi.mock("@/lib/propertiesQuery", () => ({ loadProperties: vi.fn() }));
 vi.mock("@/components/map/MapPanel", () => ({
   MapPanel: ({
     onBoundsChange,
@@ -31,10 +32,10 @@ vi.mock("@/components/map/MapPanel", () => ({
 }));
 
 import BrowsePage from "@/app/browse/page";
-import { fetchProperties } from "@/lib/api";
+import { loadProperties } from "@/lib/propertiesQuery";
 import { makeProperty } from "./fixtures";
 
-const fetchMock = vi.mocked(fetchProperties);
+const fetchMock = vi.mocked(loadProperties);
 const DEBOUNCE_MS = 350;
 
 const listings = [
@@ -53,7 +54,7 @@ function layoutForHiddenClass(this: HTMLElement): DOMRectList {
 beforeEach(() => {
   vi.useFakeTimers();
   fetchMock.mockReset();
-  fetchMock.mockResolvedValue({ properties: listings, truncated: false });
+  fetchMock.mockResolvedValue({ status: "success", properties: listings, truncated: false });
   scrollIntoView.mockReset();
   HTMLElement.prototype.scrollIntoView = scrollIntoView;
   vi.spyOn(HTMLElement.prototype, "getClientRects").mockImplementation(layoutForHiddenClass);
