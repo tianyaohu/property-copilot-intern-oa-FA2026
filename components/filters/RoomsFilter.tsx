@@ -8,11 +8,14 @@ import { BATHROOM_OPTIONS, BEDROOM_OPTIONS, type FilterBodyProps } from "@/compo
 /**
  * Bedrooms (Studio/1/2/3/4/5) with an exact-match toggle — unchecked means "at
  * least N", checked means "exactly N"; clicking the selected value again clears
- * it. Bathrooms is minimum-only. Every change applies instantly — a room click
- * can't produce an invalid state, so there is nothing to stage or validate.
+ * it. Studio (0) is the exception: a minimum of 0 would match every listing, so
+ * it is always an exact match and the toggle is locked on. Bathrooms is
+ * minimum-only. Every change applies instantly — a room click can't produce an
+ * invalid state, so there is nothing to stage or validate.
  */
 export function RoomsFilter({ filter, onChange }: FilterBodyProps) {
   const set = (patch: Partial<PropertyFilter>) => onChange({ ...filter, ...patch });
+  const studioSelected = filter.bedrooms === 0;
 
   return (
     <div className="space-y-4">
@@ -26,9 +29,13 @@ export function RoomsFilter({ filter, onChange }: FilterBodyProps) {
         />
         <Checkbox
           label="Use exact match"
-          checked={filter.bedroomsExact ?? false}
+          checked={studioSelected || (filter.bedroomsExact ?? false)}
+          disabled={studioSelected}
           onChange={(e) => set({ bedroomsExact: e.target.checked || undefined })}
         />
+        {studioSelected ? (
+          <p className="text-xs text-muted">Studios always match exactly.</p>
+        ) : null}
       </div>
       <div className="space-y-2 border-t border-border pt-4">
         <p className="text-xs font-medium text-muted">Bathrooms</p>

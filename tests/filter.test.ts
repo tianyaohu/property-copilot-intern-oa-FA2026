@@ -38,6 +38,31 @@ describe("filterProperties", () => {
     expect(result.map((p) => p.id)).toEqual(["two-bed", "three-bed"]);
   });
 
+  test("studio (0 bedrooms) matches only studios, not every listing", () => {
+    // A minimum of 0 is true for every listing (bedroom counts are never
+    // negative). The Studio control sends bedrooms=0 without bedroomsExact,
+    // and the chip labels that state "Studio bd", so the predicate has to
+    // treat 0 as an exact studio match — including when exact is explicitly
+    // false. Otherwise the filter looks active and changes nothing.
+    const items = [
+      makeProperty({ id: "studio", bedrooms: 0 }),
+      makeProperty({ id: "one-bed", bedrooms: 1 }),
+      makeProperty({ id: "four-bed", bedrooms: 4 })
+    ];
+
+    expect(filterProperties(items, { bedrooms: 0 }).map((p) => p.id)).toEqual(["studio"]);
+    expect(
+      filterProperties(items, { bedrooms: 0, bedroomsExact: false }).map((p) => p.id)
+    ).toEqual(["studio"]);
+  });
+
+  test("studio filter narrows the seeded catalogue to its 0-bedroom listings", () => {
+    const studios = filterProperties(PROPERTIES, { bedrooms: 0 });
+    expect(PROPERTIES).toHaveLength(50);
+    expect(studios).toHaveLength(11);
+    expect(studios.every((p) => p.bedrooms === 0)).toBe(true);
+  });
+
   test("bedroomsExact restricts to an exact bedroom count, not a minimum", () => {
     const items = [
       makeProperty({ id: "one-bed", bedrooms: 1 }),

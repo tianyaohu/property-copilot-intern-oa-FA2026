@@ -61,8 +61,8 @@ export function roomsLabel({ bedrooms, bedroomsExact, bathrooms }: PropertyFilte
   if (bedrooms === undefined && bathrooms === undefined) return "Beds & baths";
   const parts: string[] = [];
   if (bedrooms !== undefined) {
-    // "at least studio" is every listing, so never show it as a minimum;
-    // an exact-match studio is still worth surfacing on its own.
+    // Studio is an exact 0-bedroom match (see the bedrooms predicate), so the
+    // chip says "Studio" rather than "0+" — a minimum of 0 would be every listing.
     const label = bedrooms === 0 ? "Studio" : bedroomsExact ? `${bedrooms}` : `${bedrooms}+`;
     parts.push(`${label} bd`);
   }

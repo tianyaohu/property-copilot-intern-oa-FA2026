@@ -81,6 +81,26 @@ describe("route: GET /properties", () => {
     expect(queryByBoundingBox).not.toHaveBeenCalled();
   });
 
+  test("bedrooms=0 returns studios only, not every in-view listing", async () => {
+    // The Studio chip serializes as bedrooms=0 with no bedroomsExact flag.
+    queryByBoundingBox.mockResolvedValue([
+      property({ id: "studio", bedrooms: 0 }),
+      property({ id: "one-bed", bedrooms: 1 }),
+      property({ id: "four-bed", bedrooms: 4 })
+    ]);
+
+    const res = await route({
+      method: "GET",
+      path: "/properties",
+      query: { bbox: "49,-124,50,-122", bedrooms: "0" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.body as { properties: Property[]; count: number };
+    expect(body.properties.map((p) => p.id)).toEqual(["studio"]);
+    expect(body.count).toBe(1);
+  });
+
   test("attribute filters compose on the geo result", async () => {
     queryByBoundingBox.mockResolvedValue([
       property({ id: "cheap", rent: 1500 }),
