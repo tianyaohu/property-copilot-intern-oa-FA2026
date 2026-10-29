@@ -5,8 +5,24 @@ import { validatePriceRange } from "@/lib/priceValidation";
 import { Input } from "@/components/ui/Input";
 import type { FilterBodyProps } from "@/components/filters/filterOptions";
 
+/** A complete decimal. Partials ("1.", "-", "1e") and non-numeric tokens stay out. */
+const COMPLETE_RENT = /^-?\d+(?:\.\d+)?$/;
+
+/**
+ * "" is an explicit clear. Any other token that is not a complete finite
+ * decimal is NaN, which `rentRangeIssue` rejects. A number input sanitizes
+ * those tokens ("e", ".", "NaN", "Infinity", "1e309") to "", and committing
+ * that empty string drops the bound — the next list request then returns
+ * every listing in the viewport.
+ */
 function numberOrUndefined(value: string): number | undefined {
-  return value === "" ? undefined : Number(value);
+  // Only a fully empty field clears the bound. A whitespace-only value is not
+  // a clear — committing it would drop the filter the same way "" used to.
+  if (value === "") return undefined;
+  const trimmed = value.trim();
+  if (!COMPLETE_RENT.test(trimmed)) return Number.NaN;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : Number.NaN;
 }
 
 /**
@@ -47,9 +63,9 @@ export function PriceFilter({ filter, onChange }: FilterBodyProps) {
       <div className="flex items-start gap-3">
         <Input
           label="Minimum"
-          type="number"
-          min={0}
-          step={100}
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
           placeholder="Any"
           value={minText}
           aria-invalid={error !== null}
@@ -60,9 +76,9 @@ export function PriceFilter({ filter, onChange }: FilterBodyProps) {
         />
         <Input
           label="Maximum"
-          type="number"
-          min={0}
-          step={100}
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
           placeholder="Any"
           value={maxText}
           aria-invalid={error !== null}

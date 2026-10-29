@@ -8,6 +8,8 @@ import { rentRangeIssue } from "@/shared/contract";
  * names. The backend still re-validates; a non-UI caller can bypass this.
  */
 const RENT_RANGE_MESSAGE = {
+  "non-finite-min": "Minimum rent must be a finite number.",
+  "non-finite-max": "Maximum rent must be a finite number.",
   "negative-min": "Minimum rent can't be negative.",
   "negative-max": "Maximum rent can't be negative.",
   inverted: "Minimum rent can't be more than maximum rent."

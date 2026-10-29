@@ -30,4 +30,17 @@ describe("validatePriceRange", () => {
   it("rejects an inverted range", () => {
     expect(validatePriceRange(3000, 2000)).toBe("Minimum rent can't be more than maximum rent.");
   });
+
+  it("rejects a non-finite bound", () => {
+    // NaN and Infinity fail every comparison in rentRangeIssue, so they used to
+    // look valid. A NaN minimum then matches every listing (rent < NaN is
+    // never true) and serializes as minRent=NaN.
+    expect(validatePriceRange(Number.NaN, undefined)).toBe("Minimum rent must be a finite number.");
+    expect(validatePriceRange(undefined, Number.POSITIVE_INFINITY)).toBe(
+      "Maximum rent must be a finite number."
+    );
+    expect(validatePriceRange(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY)).toBe(
+      "Minimum rent must be a finite number."
+    );
+  });
 });

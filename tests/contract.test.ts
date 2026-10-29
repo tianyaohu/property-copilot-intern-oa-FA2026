@@ -31,12 +31,16 @@ vi.mock("../backend/src/properties", async (importOriginal) => {
 });
 
 const apiRentMessage = {
+  "non-finite-min": "minRent must be a finite number",
+  "non-finite-max": "maxRent must be a finite number",
   "negative-min": "minRent must be greater than or equal to 0",
   "negative-max": "maxRent must be greater than or equal to 0",
   inverted: "minRent must not be greater than maxRent"
 } as const;
 
 const uiRentMessage = {
+  "non-finite-min": "Minimum rent must be a finite number.",
+  "non-finite-max": "Maximum rent must be a finite number.",
   "negative-min": "Minimum rent can't be negative.",
   "negative-max": "Maximum rent can't be negative.",
   inverted: "Minimum rent can't be more than maximum rent."

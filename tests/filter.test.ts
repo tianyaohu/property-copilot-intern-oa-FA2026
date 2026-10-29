@@ -208,6 +208,18 @@ describe("validateFilterQuery", () => {
 });
 
 describe("validateFilter", () => {
+  test("rejects a non-finite rent bound before a negative or inverted one", () => {
+    // NaN fails `< 0` and `>`, so it used to pass validation and then match
+    // every listing. The message matches the query-string syntax error.
+    expect(validateFilter({ minRent: Number.NaN })).toBe("minRent must be a finite number");
+    expect(validateFilter({ maxRent: Number.POSITIVE_INFINITY })).toBe(
+      "maxRent must be a finite number"
+    );
+    expect(validateFilter({ minRent: Number.NaN, maxRent: -1 })).toBe(
+      "minRent must be a finite number"
+    );
+  });
+
   test("rejects a negative minRent", () => {
     expect(validateFilter({ minRent: -1 })).not.toBeNull();
   });
