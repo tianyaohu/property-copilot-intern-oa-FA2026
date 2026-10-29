@@ -289,4 +289,15 @@ describe("route: GET /properties/:id", () => {
 
     expect(getPropertyById).toHaveBeenCalledWith("a b");
   });
+
+  test("a malformed percent-encoding in the id is a 400, not an internal error", async () => {
+    // decodeURIComponent("%") throws. Letting that escape makes the HTTP
+    // layer answer 500, which the client shows as a downed backend for a
+    // bad URL.
+    const res = await route({ method: "GET", path: "/properties/%", query: {} });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: "Invalid property id" });
+    expect(getPropertyById).not.toHaveBeenCalled();
+  });
 });

@@ -31,7 +31,19 @@ export async function route(req: ApiRequest): Promise<ApiResponse> {
   // GET /properties/:id
   const detailMatch = req.path.match(/^\/properties\/([^/]+)$/);
   if (detailMatch) {
-    const property = await getPropertyById(decodeURIComponent(detailMatch[1]));
+    // One decode, matching encodeURIComponent on the client. A bare "%" is a
+    // bad URL, not a missing row and not an internal failure — decode throws
+    // URIError, and letting it escape becomes a 500.
+    let id: string;
+    try {
+      id = decodeURIComponent(detailMatch[1]);
+    } catch (err) {
+      if (err instanceof URIError) {
+        return { statusCode: 400, body: { error: "Invalid property id" } };
+      }
+      throw err;
+    }
+    const property = await getPropertyById(id);
     if (!property) {
       return { statusCode: 404, body: { error: "Property not found" } };
     }

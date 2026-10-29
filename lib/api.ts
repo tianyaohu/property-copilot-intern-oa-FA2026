@@ -26,7 +26,26 @@ export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> 
   return body as T;
 }
 
+function isProperty(value: unknown): value is Property {
+  if (!value || typeof value !== "object") return false;
+  const id = (value as { id?: unknown }).id;
+  return typeof id === "string" && id !== "";
+}
+
+/**
+ * GET `/properties/:id`. The id is one path segment: a raw slash, `?`, or `%`
+ * would be parsed as extra path, a query string, or a malformed escape, and
+ * the detail route would 404, 500, or return a different listing while this
+ * call still looked successful. A 200 that is not the detail envelope — the
+ * list body `{ properties, count, truncated }` has no `property` — is a
+ * failure, not a listing.
+ */
 export async function fetchProperty(id: string): Promise<Property> {
-  const data = await apiGet<PropertyResponse>(`/properties/${id}`);
+  const data = await apiGet<Partial<PropertyResponse> | null>(
+    `/properties/${encodeURIComponent(id)}`
+  );
+  if (!data || !isProperty(data.property)) {
+    throw new Error("Failed to load listing");
+  }
   return data.property;
 }
