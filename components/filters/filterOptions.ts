@@ -1,5 +1,9 @@
 import { CAD } from "@/lib/format";
-import type { PropertyFilter, PropertyType } from "@/lib/types";
+import {
+  PROPERTY_TYPES as PROPERTY_TYPE_VALUES,
+  type PropertyFilter,
+  type PropertyType
+} from "@/lib/types";
 
 /** Shared prop shape for every filter body. `onChange` receives the full next
  * filter (bodies merge their patch), so the same body works standalone in a
@@ -9,12 +13,17 @@ export type FilterBodyProps = {
   onChange: (next: PropertyFilter) => void;
 };
 
-export const PROPERTY_TYPES: { value: PropertyType; label: string }[] = [
-  { value: "apartment", label: "Apartment" },
-  { value: "condo", label: "Condo" },
-  { value: "house", label: "House" },
-  { value: "townhouse", label: "Townhouse" }
-];
+const PROPERTY_TYPE_LABEL: Record<PropertyType, string> = {
+  apartment: "Apartment",
+  condo: "Condo",
+  house: "House",
+  townhouse: "Townhouse"
+};
+
+/** Wire enum, in contract order, with the labels the filter UI shows. */
+export const PROPERTY_TYPES: { value: PropertyType; label: string }[] = PROPERTY_TYPE_VALUES.map(
+  (value) => ({ value, label: PROPERTY_TYPE_LABEL[value] })
+);
 
 /**
  * Bedrooms has no explicit "Any" entry — clicking the selected value again

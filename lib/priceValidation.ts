@@ -1,20 +1,19 @@
+import { rentRangeIssue } from "@/shared/contract";
+
 /**
- * Validate a rent range for the price filter UI. Mirrors the domain rules
- * enforced server-side by validateFilter in backend/src/filter.ts, narrowed
- * to the two rent fields — bedrooms/bathrooms don't need this here since
- * they're stepper-driven and can't go negative by construction. This is a
- * UX nicety only: the backend is the source of truth and re-validates
- * independently, since a non-UI caller can always bypass this check.
+ * UI copy for a rent range. The accept/reject decision is `rentRangeIssue`
+ * in the shared contract — the same function the API validator uses — so a
+ * range the price inputs commit is a range the server will accept. Wording
+ * stays here because the UI speaks in sentences and the API speaks in field
+ * names. The backend still re-validates; a non-UI caller can bypass this.
  */
+const RENT_RANGE_MESSAGE = {
+  "negative-min": "Minimum rent can't be negative.",
+  "negative-max": "Maximum rent can't be negative.",
+  inverted: "Minimum rent can't be more than maximum rent."
+} as const;
+
 export function validatePriceRange(minRent?: number, maxRent?: number): string | null {
-  if (minRent !== undefined && minRent < 0) {
-    return "Minimum rent can't be negative.";
-  }
-  if (maxRent !== undefined && maxRent < 0) {
-    return "Maximum rent can't be negative.";
-  }
-  if (minRent !== undefined && maxRent !== undefined && minRent > maxRent) {
-    return "Minimum rent can't be more than maximum rent.";
-  }
-  return null;
+  const issue = rentRangeIssue(minRent, maxRent);
+  return issue === null ? null : RENT_RANGE_MESSAGE[issue];
 }

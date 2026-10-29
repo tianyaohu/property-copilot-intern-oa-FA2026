@@ -1,31 +1,16 @@
-export type PropertyType = "apartment" | "condo" | "house" | "townhouse";
+/**
+ * Frontend door to the shared wire contract (`shared/contract.ts`).
+ * Components keep importing listing and filter types from here. The value
+ * re-exports are plain data — no server code — so client components can
+ * import this module.
+ */
+export type {
+  City,
+  PropertiesListResponse,
+  Property,
+  PropertyFilter,
+  PropertyResponse,
+  PropertyType
+} from "@/shared/contract";
 
-export type City = "Vancouver" | "Richmond" | "Burnaby" | "Surrey";
-
-/** Listing shape returned by the AWS API. Mirrors the backend Property type. */
-export type Property = {
-  id: string;
-  title: string;
-  description: string;
-  rent: number;
-  bedrooms: number;
-  bathrooms: number;
-  propertyType: PropertyType;
-  squareFeet: number;
-  street: string;
-  city: City;
-  province: string;
-  postalCode: string;
-  lat: number;
-  lng: number;
-  geohash: string;
-  geohashPrefix: string;
-  images: string[];
-  createdAt: string;
-};
-
-// PropertyFilter has a single definition (backend/src/types.ts), re-exported
-// here so the frontend imports it from @/lib/types like every other shared
-// type. `export type` is erased at build time, so this pulls no backend code
-// into the browser bundle. Property/PropertyType/City stay mirrored above.
-export type { PropertyFilter } from "@/backend/src/types";
+export { CITIES, PROPERTY_TYPES } from "@/shared/contract";

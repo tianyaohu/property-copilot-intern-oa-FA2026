@@ -1,4 +1,4 @@
-import type { Property } from "./types";
+import type { Property, PropertyResponse } from "./types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 
@@ -27,6 +27,6 @@ export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> 
 }
 
 export async function fetchProperty(id: string): Promise<Property> {
-  const data = await apiGet<{ property: Property }>(`/properties/${id}`);
+  const data = await apiGet<PropertyResponse>(`/properties/${id}`);
   return data.property;
 }
