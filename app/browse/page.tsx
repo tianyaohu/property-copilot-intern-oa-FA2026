@@ -101,8 +101,11 @@ export default function BrowsePage() {
 
   const hasActiveFilters = countActiveFilters(filter) > 0;
 
+  // The fixed map/list bar occupies the bottom edge below `sm`. This padding
+  // is its height (44px targets + inset, including the home indicator) so the
+  // last card can scroll above it. Removed at `sm`, where the bar hides.
   return (
-    <section className="space-y-4">
+    <section className="space-y-4 pb-[calc(4.5rem+env(safe-area-inset-bottom))] sm:pb-0">
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Browse rentals</h1>
         <p className="text-sm text-muted">
