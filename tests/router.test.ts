@@ -51,6 +51,24 @@ describe("route: GET /properties", () => {
     expect(queryByBoundingBox).not.toHaveBeenCalled();
   });
 
+  test("an antimeridian-crossing bbox is queried, not rejected as invalid", async () => {
+    queryByBoundingBox.mockResolvedValue([]);
+
+    const res = await route({
+      method: "GET",
+      path: "/properties",
+      query: { bbox: "10,170,20,-160" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    expect(queryByBoundingBox).toHaveBeenCalledWith({
+      minLat: 10,
+      minLng: 170,
+      maxLat: 20,
+      maxLng: -160
+    });
+  });
+
   test("malformed bbox is rejected before any query runs", async () => {
     const res = await route({
       method: "GET",

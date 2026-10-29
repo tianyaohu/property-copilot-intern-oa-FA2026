@@ -31,20 +31,31 @@ export function geohashPrefix(geohash: string): string {
 }
 
 /**
+ * Longitude ranges to enumerate. A normal box is one range. An antimeridian
+ * crossing (minLng > maxLng) is the union of [minLng, 180] and [-180, maxLng] —
+ * ngeohash.bboxes returns nothing when min longitude is greater than max.
+ */
+function longitudeSegments(minLng: number, maxLng: number): Array<[number, number]> {
+  if (minLng <= maxLng) return [[minLng, maxLng]];
+  return [
+    [minLng, 180],
+    [-180, maxLng]
+  ];
+}
+
+/**
  * The set of `geohashPrefix` partitions that cover a bounding box. A
  * bounding-box query should Query the geo GSI once per returned prefix, then
  * discard any items whose lat/lng falls outside the exact box.
  *
  * This is the geospatial primitive your viewport query is built on: turn the
- * map's visible bounds into prefixes, query those partitions, refine.
+ * map's visible bounds into prefixes, query those partitions, refine. A box
+ * that crosses the antimeridian is enumerated as two ranges so cells on both
+ * sides of the date line are included and the interior gap is not.
  */
 export function boundingBoxPrefixes(box: BoundingBox): string[] {
-  const cells = ngeohash.bboxes(
-    box.minLat,
-    box.minLng,
-    box.maxLat,
-    box.maxLng,
-    GEOHASH_PREFIX_LENGTH
+  const cells = longitudeSegments(box.minLng, box.maxLng).flatMap(([minLng, maxLng]) =>
+    ngeohash.bboxes(box.minLat, minLng, box.maxLat, maxLng, GEOHASH_PREFIX_LENGTH)
   );
   return Array.from(new Set(cells));
 }
@@ -62,15 +73,29 @@ const PREFIX_CELL_LNG_DEG = 360 / 2 ** 13;
  * cells, which would be allocated as strings before an after-the-fact guard
  * ever saw a count.
  */
-export function estimatePrefixCount(box: BoundingBox): number {
-  const rows = Math.floor((box.maxLat - box.minLat) / PREFIX_CELL_LAT_DEG) + 2;
-  const cols = Math.floor((box.maxLng - box.minLng) / PREFIX_CELL_LNG_DEG) + 2;
+function segmentPrefixCount(minLat: number, minLng: number, maxLat: number, maxLng: number): number {
+  const rows = Math.floor((maxLat - minLat) / PREFIX_CELL_LAT_DEG) + 2;
+  const cols = Math.floor((maxLng - minLng) / PREFIX_CELL_LNG_DEG) + 2;
   return rows * cols;
+}
+
+export function estimatePrefixCount(box: BoundingBox): number {
+  // A crossing has minLng > maxLng, so a single (max - min) width is negative
+  // and would slip under the fan-out guard. Count each side of the date line.
+  return longitudeSegments(box.minLng, box.maxLng).reduce(
+    (total, [minLng, maxLng]) => total + segmentPrefixCount(box.minLat, minLng, box.maxLat, maxLng),
+    0
+  );
 }
 
 /** Whether a coordinate lies inside a bounding box (inclusive edges). */
 export function isInBoundingBox(lat: number, lng: number, box: BoundingBox): boolean {
-  return lat >= box.minLat && lat <= box.maxLat && lng >= box.minLng && lng <= box.maxLng;
+  if (lat < box.minLat || lat > box.maxLat) return false;
+  // minLng > maxLng is the antimeridian: inside if on either side of the date line.
+  if (box.minLng > box.maxLng) {
+    return lng >= box.minLng || lng <= box.maxLng;
+  }
+  return lng >= box.minLng && lng <= box.maxLng;
 }
 
 export function parseBoundingBox(query: Record<string, string | undefined>): BoundingBox | null {
@@ -89,8 +114,14 @@ export function parseBoundingBox(query: Record<string, string | undefined>): Bou
   const maxLng = Number(parts[3]);
 
   if (![minLat, minLng, maxLat, maxLng].every(Number.isFinite)) return null;
-  if (minLat < -90 || maxLat > 90 || minLng < -180 || maxLng > 180) return null;
-  if (minLat > maxLat || minLng > maxLng) return null;
+  // Each edge is checked on its own. The old minLng < -180 || maxLng > 180
+  // test only works when minLng <= maxLng; a crossing can put an out-of-range
+  // value on the min side (minLng=200, maxLng=-170) and slip through it.
+  if (minLat < -90 || minLat > 90 || maxLat < -90 || maxLat > 90) return null;
+  if (minLng < -180 || minLng > 180 || maxLng < -180 || maxLng > 180) return null;
+  // Latitude does not wrap. Longitude does: minLng > maxLng is the
+  // antimeridian (the box covers [minLng, 180] ∪ [-180, maxLng]), not a swap.
+  if (minLat > maxLat) return null;
 
   return { minLat, minLng, maxLat, maxLng };
 }

@@ -46,12 +46,14 @@ export async function route(req: ApiRequest): Promise<ApiResponse> {
   //
   // `bbox` (minLat,minLng,maxLat,maxLng) is required — the geo-index GSI is
   // the only read path, so a request's cost is proportional to its viewport
-  // and there is no scan-the-world fallback. An invalid filter (negative
-  // bound, or an inverted rent range) is also rejected before any query
-  // runs — otherwise it would silently produce an empty result that reads
-  // as "no listings" rather than "bad request". Attribute filters compose
-  // after the geospatial query (reusing the pure logic in filter.ts), and
-  // the result cap runs last so filters never lose matches to it.
+  // and there is no scan-the-world fallback. minLng > maxLng is not a swapped
+  // pair: it is an antimeridian crossing (the box covers both sides of the
+  // date line). An invalid filter (negative bound, or an inverted rent range)
+  // is also rejected before any query runs — otherwise it would silently
+  // produce an empty result that reads as "no listings" rather than "bad
+  // request". Attribute filters compose after the geospatial query (reusing
+  // the pure logic in filter.ts), and the result cap runs last so filters
+  // never lose matches to it.
   if (req.path === "/properties") {
     if (req.query.bbox === undefined) {
       return {

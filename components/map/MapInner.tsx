@@ -5,6 +5,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { Map as MaplibreMap } from "maplibre-gl";
 import { Map, Marker, Popup } from "react-map-gl/maplibre";
 import { formatCompactRent } from "@/lib/format";
+import { serializeMapBounds } from "@/lib/mapBounds";
 import { PropertyCard } from "@/components/property/PropertyCard";
 import type { MapPanelProps } from "./MapPanel";
 
@@ -23,25 +24,14 @@ const CIRCLE_ZOOM_THRESHOLD = 10;
 const MAP_STYLE_URL =
   process.env.NEXT_PUBLIC_MAP_STYLE_URL ?? "https://tiles.openfreemap.org/styles/liberty";
 
-const clamp = (value: number, min: number, max: number) =>
-  Math.min(max, Math.max(min, value));
-
 // The map is the source of truth for "where is the user looking": serialize
 // its bounds in the exact shape parseBoundingBox expects (lat first).
-// MapLibre's getBounds() does not wrap or clamp — zoomed out past the world,
-// or panned across the antimeridian, it returns longitudes beyond ±180 (and
-// latitudes beyond ±90), which the server rejects as an invalid bbox. Clamping
-// keeps the request valid, so an oversized viewport surfaces as the intended
-// "Viewport too large; zoom in" from the fan-out guard instead of a parse
-// error. (An antimeridian-crossing view collapses to a wide valid box — an
-// acceptable trade-off for a metro-area product.)
+// MapLibre's getBounds() reports unwrapped longitudes — a date-line view is
+// west=170, east=200, not a wrapped pair. serializeMapBounds turns that into
+// an ordinary box or a minLng > maxLng antimeridian crossing.
 function serializeBounds(map: MaplibreMap): string {
   const b = map.getBounds();
-  const south = clamp(b.getSouth(), -90, 90);
-  const west = clamp(b.getWest(), -180, 180);
-  const north = clamp(b.getNorth(), -90, 90);
-  const east = clamp(b.getEast(), -180, 180);
-  return `${south},${west},${north},${east}`;
+  return serializeMapBounds(b.getSouth(), b.getWest(), b.getNorth(), b.getEast());
 }
 
 // True once the map's canvas has an actual laid-out size. On mobile, the map
