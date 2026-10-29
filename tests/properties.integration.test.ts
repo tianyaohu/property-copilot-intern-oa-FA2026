@@ -16,8 +16,9 @@ import type { Property } from "../backend/src/types";
 // green without Docker.
 const ENDPOINT = process.env.DYNAMODB_ENDPOINT;
 
-// tests/setup.ts pins this to "Properties-test" before modules load, so the
-// data layer (db.ts TABLE_NAME) and this admin client agree.
+// tests/setup.ts pins PROPERTIES_TABLE before the suite loads. The data layer
+// reads that name when it builds each request (not at import), and this admin
+// client reads the same variable, so both target one table.
 const TABLE_NAME = process.env.PROPERTIES_TABLE ?? "Properties-test";
 
 const admin = new DynamoDBClient({

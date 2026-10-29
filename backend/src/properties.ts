@@ -1,5 +1,5 @@
 import { GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
-import { GEO_INDEX, TABLE_NAME, getDocClient } from "./db";
+import { GEO_INDEX, getDocClient, tableName } from "./db";
 import {
   boundingBoxPrefixes,
   encodeGeohash,
@@ -39,13 +39,13 @@ export async function putProperty(
   property: Omit<Property, "geohash" | "geohashPrefix">
 ): Promise<Property> {
   const item = withGeoAttributes(property);
-  await getDocClient().send(new PutCommand({ TableName: TABLE_NAME, Item: item }));
+  await getDocClient().send(new PutCommand({ TableName: tableName(), Item: item }));
   return item;
 }
 
 export async function getPropertyById(id: string): Promise<Property | null> {
   const result = await getDocClient().send(
-    new GetCommand({ TableName: TABLE_NAME, Key: { id } })
+    new GetCommand({ TableName: tableName(), Key: { id } })
   );
   return (result.Item as Property | undefined) ?? null;
 }
@@ -70,7 +70,7 @@ async function queryPrefix(prefix: string): Promise<Property[]> {
   do {
     const result = await getDocClient().send(
       new QueryCommand({
-        TableName: TABLE_NAME,
+        TableName: tableName(),
         IndexName: GEO_INDEX,
         KeyConditionExpression: "geohashPrefix = :p",
         ExpressionAttributeValues: { ":p": prefix },
