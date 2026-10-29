@@ -17,12 +17,6 @@ import type { Property } from "./types";
 // estimate to ~33M cells) — for the frontend and raw API callers alike.
 export const MAX_PREFIXES = 800;
 
-// Cap on items returned per query; `truncated` tells the client to zoom in
-// for the rest. Applied AFTER attribute filters (see capResults / router.ts)
-// so a narrow filter never loses qualifying listings to the cap. Unreachable
-// at 50 seeded listings, load-bearing at real data volumes.
-export const MAX_RESULTS = 200;
-
 /** Raised before any DynamoDB work when a bbox would fan out too widely. */
 export class ViewportTooLargeError extends Error {
   constructor(estimatedPrefixes: number) {
@@ -90,32 +84,13 @@ async function queryPrefix(prefix: string): Promise<Property[]> {
   return items;
 }
 
-export type CappedResults = {
-  properties: Property[];
-  /** True when MAX_RESULTS clipped the response; the client should zoom in. */
-  truncated: boolean;
-};
-
-/**
- * Clip a result set to MAX_RESULTS. Pure so the router can apply it after
- * attribute filters — capping before filtering would silently drop qualifying
- * listings whenever the raw viewport match count exceeded the cap.
- */
-export function capResults(properties: Property[]): CappedResults {
-  const truncated = properties.length > MAX_RESULTS;
-  return {
-    properties: truncated ? properties.slice(0, MAX_RESULTS) : properties,
-    truncated
-  };
-}
-
 /**
  * Geospatial viewport query. Turns the box into the geohash prefixes that
  * cover it, Queries those geo-index partitions in parallel (each paginated),
  * then trims the prefix-cell overhang back to the exact box. The fan-out
  * guard runs on an arithmetic estimate so hostile boxes are rejected before
  * any cell strings are allocated. Attribute filters and the result cap are
- * composed by the caller (router.ts) — filters first, then the cap.
+ * composed by the caller (search.ts) — filters first, then the cap.
  */
 export async function queryByBoundingBox(box: BoundingBox): Promise<Property[]> {
   const estimated = estimatePrefixCount(box);
