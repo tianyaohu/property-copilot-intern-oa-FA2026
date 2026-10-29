@@ -1,4 +1,4 @@
-import { parseFilter, validateFilter } from "./filter";
+import { parseFilter, validateFilter, validateFilterQuery } from "./filter";
 import { parseBoundingBox, type BoundingBox } from "./geo";
 import type { PropertyFilter } from "./types";
 
@@ -17,12 +17,12 @@ const BBOX_REQUIRED = "bbox is required (bbox=minLat,minLng,maxLat,maxLng)";
 const BBOX_INVALID = "Invalid bbox (expected bbox=minLat,minLng,maxLat,maxLng)";
 
 /**
- * Parse and validate a listings query. Bbox syntax and filter syntax are
- * decided here, then validateFilter's domain rules (no negative bound, no
- * inverted rent range). An invalid filter must fail the request — if it were
- * dropped, filterProperties would return an empty list that reads as "no
- * listings". Bedroom matching is not decided here: bedrooms=0 stays a number
- * and the studio rule lives in the filter predicate.
+ * Parse and validate a listings query. Bbox syntax is decided here, then
+ * validateFilterQuery (a non-blank number must be finite) and validateFilter's
+ * domain rules (no negative bound, no inverted rent range). A non-finite token
+ * must fail the request — if it were dropped, the response would be 200 and
+ * every listing in the box. Bedroom matching is not decided here: bedrooms=0
+ * stays a number and the studio rule lives in the filter predicate.
  */
 export function parsePropertiesQuery(query: Query): PropertiesQuery {
   // Missing and blank are different errors. `bbox` absent is "required";
@@ -34,6 +34,11 @@ export function parsePropertiesQuery(query: Query): PropertiesQuery {
   const box = parseBoundingBox(query);
   if (!box) {
     return { ok: false, error: BBOX_INVALID };
+  }
+
+  const syntaxError = validateFilterQuery(query);
+  if (syntaxError) {
+    return { ok: false, error: syntaxError };
   }
 
   const filter = parseFilter(query);

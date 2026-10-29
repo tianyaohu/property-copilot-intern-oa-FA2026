@@ -17,10 +17,11 @@ function parseNumber(raw: string | undefined): number | undefined {
 
 /**
  * A filter dimension, defined once. Each descriptor owns its whole lifecycle —
- * parse (query → filter patch), validate (domain rule), predicate (does a
- * listing pass), serialize (filter → query params) — so adding a dimension is a
- * single entry in FILTER_FIELDS instead of the same change threaded through
- * parseFilter, validateFilter, filterProperties, and the query serializer.
+ * parse (query → filter patch), syntax (reject a non-finite raw token),
+ * validate (domain rule), predicate (does a listing pass), serialize (filter →
+ * query params) — so adding a dimension is a single entry in FILTER_FIELDS
+ * instead of the same change threaded through parseFilter, validateFilterQuery,
+ * validateFilter, filterProperties, and the query serializer.
  *
  * Granularity is one descriptor per *dimension*, not per field: rent owns both
  * minRent/maxRent (and their min ≤ max rule), bedrooms owns bedrooms +
@@ -28,12 +29,35 @@ function parseNumber(raw: string | undefined): number | undefined {
  */
 type FilterField = {
   parse(query: Query): Partial<PropertyFilter>;
+  /**
+   * Raw query syntax for this dimension. Blank values are not errors (they are
+   * omitted, same as an absent param). A non-blank value that is not a finite
+   * number is an error: dropping it would apply no constraint and return a
+   * 200 of every listing in the viewport.
+   */
+  syntax?(query: Query): string | null;
   validate?(filter: PropertyFilter): string | null;
   predicate(property: Property, filter: PropertyFilter): boolean;
   serialize(filter: PropertyFilter, params: URLSearchParams): void;
 };
 
+/**
+ * Blank stays "no constraint". Anything else that Number() cannot accept
+ * (`lots`, `1000,2000` from a repeated query key, `Infinity`) must not be
+ * parsed as "absent" — the caller rejects the request instead.
+ */
+function finiteNumberSyntax(name: string, raw: string | undefined): string | null {
+  if (raw === undefined || raw.trim() === "") return null;
+  if (!Number.isFinite(Number(raw))) return `${name} must be a finite number`;
+  return null;
+}
+
 const rent: FilterField = {
+  syntax(query) {
+    return (
+      finiteNumberSyntax("minRent", query.minRent) ?? finiteNumberSyntax("maxRent", query.maxRent)
+    );
+  },
   parse(query) {
     const patch: Partial<PropertyFilter> = {};
     const minRent = parseNumber(query.minRent);
@@ -64,6 +88,9 @@ const rent: FilterField = {
 };
 
 const bedrooms: FilterField = {
+  syntax(query) {
+    return finiteNumberSyntax("bedrooms", query.bedrooms);
+  },
   parse(query) {
     const patch: Partial<PropertyFilter> = {};
     const value = parseNumber(query.bedrooms);
@@ -97,6 +124,9 @@ const bedrooms: FilterField = {
 };
 
 const bathrooms: FilterField = {
+  syntax(query) {
+    return finiteNumberSyntax("bathrooms", query.bathrooms);
+  },
   parse(query) {
     const patch: Partial<PropertyFilter> = {};
     const value = parseNumber(query.bathrooms);
@@ -143,8 +173,9 @@ const propertyTypes: FilterField = {
 /**
  * The filter registry — the single source of truth for every dimension. Adding
  * a filter is one entry here (plus the field on PropertyFilter in shared/contract.ts).
- * Order is only observable in validateFilter (first violation wins) and matches
- * the original hand-written field order.
+ * Order is only observable when a validator reports the first violation
+ * (validateFilterQuery, then validateFilter) and matches the original
+ * hand-written field order.
  */
 const FILTER_FIELDS: readonly FilterField[] = [rent, bedrooms, bathrooms, propertyTypes];
 
@@ -161,8 +192,12 @@ export function filterProperties(properties: Property[], filter: PropertyFilter)
 
 /**
  * Parse raw query-string values into a PropertyFilter, one dimension at a time.
- * Per-field syntax only (blank/unparseable/invalid-enum values are omitted, not
- * rejected) — domain-level range rules live in validateFilter.
+ * Blank values and anything that is not a finite number are omitted here.
+ * That omission is only safe for numbers because validateFilterQuery rejects
+ * them first at the HTTP boundary — otherwise `?minRent=1000,2000` would look
+ * like "no rent filter" and return every listing. Invalid property-type
+ * tokens are still dropped (an unknown type does not fail the request).
+ * Domain-level range rules live in validateFilter.
  */
 export function parseFilter(query: Query): PropertyFilter {
   return FILTER_FIELDS.reduce<PropertyFilter>(
@@ -172,12 +207,29 @@ export function parseFilter(query: Query): PropertyFilter {
 }
 
 /**
+ * Reject raw numeric params that are present but not finite numbers.
+ * Blank (`?maxRent=`) stays valid and means "no bound" — Number("") is 0, so
+ * treating blank as zero would hide every listing. A comma-joined duplicate
+ * (`minRent=1000&minRent=2000` → `1000,2000` on HTTP API payload 2.0) or any
+ * other non-numeric token is a bad request, not a silent no-op.
+ * Returns the first violation, in registry order, or null.
+ */
+export function validateFilterQuery(query: Query): string | null {
+  for (const field of FILTER_FIELDS) {
+    const error = field.syntax?.(query);
+    if (error) return error;
+  }
+  return null;
+}
+
+/**
  * Validate a parsed PropertyFilter's domain rules (no negative bound, no
- * inverted rent range). Separate from parseFilter, which only handles per-field
- * syntax — an inverted or negative range should fail the whole request instead
- * of being quietly dropped, since filterProperties would otherwise return an
- * empty result that reads as "no listings" rather than "bad request". Returns
- * the first violation message, or null when the filter is valid.
+ * inverted rent range). Separate from validateFilterQuery, which rejects
+ * non-finite raw tokens before they can be omitted. An inverted or negative
+ * range fails the whole request instead of being quietly dropped, since
+ * filterProperties would otherwise return an empty result that reads as
+ * "no listings" rather than "bad request". Returns the first violation
+ * message, or null when the filter is valid.
  */
 export function validateFilter(filter: PropertyFilter): string | null {
   for (const field of FILTER_FIELDS) {

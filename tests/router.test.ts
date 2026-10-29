@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { queryRecordFromSearchParams } from "../backend/src/query-string";
 import { route } from "../backend/src/router";
 import { ViewportTooLargeError } from "../backend/src/properties";
 import { MAX_RESULTS } from "../backend/src/search";
@@ -76,6 +77,67 @@ describe("route: GET /properties", () => {
       query: { bbox: "not,a,real,box" }
     });
     expect(res.statusCode).toBe(400);
+    expect(queryByBoundingBox).not.toHaveBeenCalled();
+  });
+
+  test("a blank maxRent is ignored, not treated as 0", async () => {
+    queryByBoundingBox.mockResolvedValue([
+      property({ id: "cheap", rent: 500 }),
+      property({ id: "pricey", rent: 3500 })
+    ]);
+
+    const res = await route({
+      method: "GET",
+      path: "/properties",
+      query: { bbox: "49,-124,50,-122", maxRent: "" }
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = res.body as { properties: Property[] };
+    expect(body.properties.map((p) => p.id)).toEqual(["cheap", "pricey"]);
+  });
+
+  test("a non-finite minRent is rejected instead of being dropped", async () => {
+    // API Gateway HTTP API payload 2.0 joins repeated keys with a comma, so
+    // `minRent=1000&minRent=2000` arrives as minRent=1000,2000. Number() of
+    // that is NaN. Dropping it would return 200 and every in-view listing,
+    // including ones outside the caller's budget.
+    queryByBoundingBox.mockResolvedValue([
+      property({ id: "cheap", rent: 500 }),
+      property({ id: "pricey", rent: 3500 })
+    ]);
+
+    const res = await route({
+      method: "GET",
+      path: "/properties",
+      query: { bbox: "49,-124,50,-122", minRent: "1000,2000" }
+    });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: "minRent must be a finite number" });
+    expect(queryByBoundingBox).not.toHaveBeenCalled();
+  });
+
+  test("repeated minRent keys are joined, then rejected, and bedrooms=0 is preserved on the query", async () => {
+    // The local server builds this map; Lambda receives the same shape from
+    // API Gateway. Last-wins would have kept minRent=2000 and applied it.
+    const params = new URLSearchParams();
+    params.set("bbox", "49,-124,50,-122");
+    params.append("minRent", "1000");
+    params.append("minRent", "2000");
+    params.append("bedrooms", "0");
+    const query = queryRecordFromSearchParams(params);
+
+    expect(query).toEqual({
+      bbox: "49,-124,50,-122",
+      minRent: "1000,2000",
+      bedrooms: "0"
+    });
+
+    const res = await route({ method: "GET", path: "/properties", query });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body).toEqual({ error: "minRent must be a finite number" });
     expect(queryByBoundingBox).not.toHaveBeenCalled();
   });
 

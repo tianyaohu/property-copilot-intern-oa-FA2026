@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { filterProperties, parseFilter, validateFilter } from "../backend/src/filter";
+import { filterProperties, parseFilter, validateFilter, validateFilterQuery } from "../backend/src/filter";
 import { SEED_PROPERTIES } from "../backend/src/seed-data";
 import type { Property } from "../backend/src/types";
 import { makeProperty } from "./fixtures";
@@ -191,6 +191,19 @@ describe("parseFilter", () => {
     expect(parseFilter({ maxRent: "" })).toEqual({});
     expect(parseFilter({ minRent: " " })).toEqual({});
     expect(parseFilter({ bedrooms: "", bathrooms: "" })).toEqual({});
+  });
+});
+
+describe("validateFilterQuery", () => {
+  test("rejects a comma-joined or non-numeric bound and still accepts studio and blanks", () => {
+    expect(validateFilterQuery({ minRent: "1000,2000" })).toBe("minRent must be a finite number");
+    expect(validateFilterQuery({ bathrooms: "lots" })).toBe("bathrooms must be a finite number");
+    // bedrooms=0 is a real studio filter, not a missing number.
+    expect(validateFilterQuery({ bedrooms: "0" })).toBeNull();
+    // Blank is "no bound". Number("") is 0, so this must not become a studio
+    // or a maxRent of 0, and it must not be a syntax error either.
+    expect(validateFilterQuery({ maxRent: "", bedrooms: "0" })).toBeNull();
+    expect(validateFilterQuery({ minRent: "  " })).toBeNull();
   });
 });
 
