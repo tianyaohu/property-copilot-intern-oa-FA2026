@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { filterFromSearch, replaceFilterSearch, sameFilter } from "@/lib/browseFilterUrl";
 import { loadProperties } from "@/lib/propertiesQuery";
 import type { Property, PropertyFilter } from "@/lib/types";
 import { FilterBar } from "@/components/filters/FilterBar";
@@ -30,7 +31,11 @@ export default function BrowsePage() {
   // displays its result).
   const [bbox, setBbox] = useState<string | null>(null);
   // Active renter filters; composed with the viewport into one server query.
+  // Start empty so the server render matches hydration. The address bar is
+  // read in a layout effect below, before paint, and written back with
+  // history.replaceState — a reload restores the same filter.
   const [filter, setFilter] = useState<PropertyFilter>({});
+  const [filterUrlReady, setFilterUrlReady] = useState(false);
   // True when the server clipped the response to its result cap; drives a
   // "zoom in to see all" hint next to the listing count.
   const [truncated, setTruncated] = useState(false);
@@ -38,6 +43,21 @@ export default function BrowsePage() {
   // "Updating…" hint instead of the full-page loading state.
   const [isFetching, setIsFetching] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+
+  useLayoutEffect(() => {
+    const fromUrl = filterFromSearch(window.location.search);
+    setFilter((current) => (sameFilter(current, fromUrl) ? current : fromUrl));
+    setFilterUrlReady(true);
+  }, []);
+
+  useEffect(() => {
+    // The first paint is still the empty filter. Writing then would strip a
+    // query the layout effect is about to apply. `filterUrlReady` is false
+    // in that effect's closure, and true only on the render that has the
+    // restored filter.
+    if (!filterUrlReady) return;
+    replaceFilterSearch(filter);
+  }, [filter, filterUrlReady]);
 
   useEffect(() => {
     if (bbox === null) return;

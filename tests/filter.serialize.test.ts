@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { parseFilter, serializeFilter } from "../backend/src/filter";
 import type { PropertyFilter } from "../backend/src/types";
 
-// serializeFilter and parseFilter are the two halves of the same field registry.
-// This pins that they stay exact inverses, so a filter the user picks always
-// survives the round-trip through the query string it is sent on.
+// serializeFilter and parseFilter are one codec (shared/filterQuery.ts),
+// re-exported by the API module. This pins that they stay exact inverses, so
+// a filter the user picks always survives the query string it is sent on.
 describe("serializeFilter / parseFilter round-trip", () => {
   const cases: PropertyFilter[] = [
     {},

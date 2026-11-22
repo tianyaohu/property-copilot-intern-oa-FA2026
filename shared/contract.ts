@@ -3,9 +3,10 @@
  *
  * Listing and filter shapes, the property-type and city enums, and the JSON
  * bodies for the property routes live here so the two sides cannot drift.
- * Query parse/serialize stays next to the filter predicates in
- * backend/src/filter.ts and imports these types. Rent-range *decisions* live
- * here too; each boundary keeps its own message text.
+ * The listings query codec (parse, serialize, numeric syntax) lives in
+ * shared/filterQuery.ts and imports these types. Match predicates stay in
+ * backend/src/filter.ts. Rent-range *decisions* live here too; each boundary
+ * keeps its own message text.
  */
 
 export const PROPERTY_TYPES = ["apartment", "condo", "house", "townhouse"] as const;
