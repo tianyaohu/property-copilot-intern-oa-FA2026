@@ -1,4 +1,4 @@
-import { serializeFilter } from "@/backend/src/filter";
+import { serializeFilter } from "@/shared/filterQuery";
 import { apiGet } from "@/lib/api";
 import type { PropertiesListResponse, Property, PropertyFilter } from "@/lib/types";
 
@@ -25,7 +25,8 @@ export type LoadPropertiesInput = {
  * Build the `/properties` path for a renter filter and a viewport.
  * Returns null when `bbox` is missing — the list API requires a viewport, and
  * callers must not invent one. Filter params are whatever `serializeFilter`
- * emits (the shared registry), appended after `bbox`.
+ * emits (shared/filterQuery.ts, the same codec the API parses), appended
+ * after `bbox`.
  */
 export function buildPropertiesQuery(
   filter: PropertyFilter = {},
