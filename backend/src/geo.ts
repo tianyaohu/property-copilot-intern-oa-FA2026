@@ -90,6 +90,9 @@ export function estimatePrefixCount(box: BoundingBox): number {
 
 /** Whether a coordinate lies inside a bounding box (inclusive edges). */
 export function isInBoundingBox(lat: number, lng: number, box: BoundingBox): boolean {
+  // NaN fails every comparison, so a non-finite latitude would otherwise fall
+  // through as inside whenever the longitude check passed.
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
   if (lat < box.minLat || lat > box.maxLat) return false;
   // minLng > maxLng is the antimeridian: inside if on either side of the date line.
   if (box.minLng > box.maxLng) {

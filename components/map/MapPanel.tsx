@@ -2,6 +2,8 @@
 
 import dynamic from "next/dynamic";
 import type { Property } from "@/lib/types";
+import { cn } from "@/lib/cn";
+import { MAP_FRAME_CLASS } from "./mapFrame";
 
 export type MapPanelProps = {
   properties: Property[];
@@ -23,7 +25,7 @@ export type MapPanelProps = {
 const MapInner = dynamic(() => import("./MapInner").then((mod) => mod.MapInner), {
   ssr: false,
   loading: () => (
-    <div className="flex h-[70vh] w-full items-center justify-center rounded-lg border border-border bg-surface sm:h-[420px] lg:h-full">
+    <div className={cn(MAP_FRAME_CLASS, "flex items-center justify-center bg-surface")}>
       <p className="text-sm text-muted">Loading map…</p>
     </div>
   )

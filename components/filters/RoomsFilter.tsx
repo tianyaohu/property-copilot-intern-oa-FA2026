@@ -25,7 +25,13 @@ export function RoomsFilter({ filter, onChange }: FilterBodyProps) {
           ariaLabel="Bedrooms"
           options={BEDROOM_OPTIONS}
           value={filter.bedrooms}
-          onChange={(value) => set({ bedrooms: filter.bedrooms === value ? undefined : value })}
+          onChange={(value) =>
+            set(
+              filter.bedrooms === value
+                ? { bedrooms: undefined, bedroomsExact: undefined }
+                : { bedrooms: value }
+            )
+          }
         />
         <Checkbox
           label="Use exact match"

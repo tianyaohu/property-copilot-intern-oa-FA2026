@@ -7,6 +7,7 @@ import { Map, Marker, Popup } from "react-map-gl/maplibre";
 import { formatCompactRent } from "@/lib/format";
 import { serializeMapBounds } from "@/lib/mapBounds";
 import { PropertyCard } from "@/components/property/PropertyCard";
+import { MAP_FRAME_CLASS } from "./mapFrame";
 import type { MapPanelProps } from "./MapPanel";
 
 // Roughly centers the four seeded cities (Vancouver, Richmond, Burnaby,
@@ -54,7 +55,7 @@ export function MapInner({ properties, activeId, onSelect, onBoundsChange }: Map
   const activeProperty = properties.find((p) => p.id === activeId);
 
   return (
-    <div className="h-[70vh] w-full overflow-hidden rounded-lg border border-border sm:h-[420px] lg:h-full">
+    <div className={MAP_FRAME_CLASS}>
       {/*
         No minZoom/maxBounds: the user can pan and zoom out as far as MapLibre
         allows (the whole world). The server's fan-out guard
