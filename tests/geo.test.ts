@@ -56,6 +56,17 @@ describe("geo", () => {
     expect(isInBoundingBox(49.28, -123.12, VANCOUVER_BOX)).toBe(true);
     expect(isInBoundingBox(49.19, -122.85, VANCOUVER_BOX)).toBe(false);
   });
+
+  test("isInBoundingBox rejects a non-finite coordinate", () => {
+    // NaN fails every relational comparison, so a NaN latitude used to fall
+    // through as "inside" whenever the longitude was in range — including on
+    // an antimeridian crossing — and survive the exact-box refine.
+    expect(isInBoundingBox(Number.NaN, -123.12, VANCOUVER_BOX)).toBe(false);
+    expect(isInBoundingBox(49.28, Number.NaN, VANCOUVER_BOX)).toBe(false);
+    const crossing = { minLat: 10, minLng: 170, maxLat: 20, maxLng: -160 };
+    expect(isInBoundingBox(Number.NaN, 175, crossing)).toBe(false);
+    expect(isInBoundingBox(15, Number.NaN, crossing)).toBe(false);
+  });
 });
 
 describe('parseBoundingBox', () => {

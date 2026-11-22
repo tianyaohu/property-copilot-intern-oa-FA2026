@@ -37,6 +37,9 @@ export default function BrowsePage() {
   // Refetches (pan/zoom) keep the previous list on screen; this drives a small
   // "Updating…" hint instead of the full-page loading state.
   const [isFetching, setIsFetching] = useState(false);
+  // Bumps on "Try again" so a failed load can be repeated without a pan or a
+  // filter change — those are otherwise the only effect dependencies.
+  const [reloadKey, setReloadKey] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -89,7 +92,7 @@ export default function BrowsePage() {
       window.clearTimeout(timer);
       abortRef.current?.abort();
     };
-  }, [bbox, filter]);
+  }, [bbox, filter, reloadKey]);
 
   // A refetch can pull the selected listing out of view; drop the selection
   // rather than point at a card that no longer exists.
@@ -100,6 +103,7 @@ export default function BrowsePage() {
   }, [properties, activeId]);
 
   const hasActiveFilters = countActiveFilters(filter) > 0;
+  const retry = () => setReloadKey((key) => key + 1);
 
   // The fixed map/list bar occupies the bottom edge below `sm`. This padding
   // is its height (44px targets + inset, including the home indicator) so the
@@ -125,7 +129,56 @@ export default function BrowsePage() {
       </div>
 
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[1fr_1.2fr]">
-        <div className={`space-y-3 order-2 lg:order-none ${mobileView === "list" ? "" : "hidden"} sm:block`}>
+        {/*
+          On a phone the list pane is `hidden` while the map is showing, so
+          status has to sit outside it — otherwise the load error, the result
+          cap, and Try again never appear on the default map view. `order-first`
+          keeps that block above the map. From `lg` it stays in the list column
+          and the map keeps the first grid row, so the count does not push the
+          map down.
+        */}
+        {state === "error" || state === "ready" ? (
+          <div className="order-first space-y-2 lg:col-start-1">
+            {state === "error" ? (
+              // Compact on purpose: the tall empty-state padding pushed the
+              // phone map back under the Map/List bar.
+              <div className="rounded-lg border border-dashed border-border bg-surface px-4 py-3 text-center">
+                <p className="text-sm font-semibold text-fg">Couldn't load listings</p>
+                <p className="mt-1 text-sm text-muted">{error}</p>
+                <div className="mt-2">
+                  <Button variant="ghost" size="sm" onClick={retry}>
+                    Try again
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-baseline justify-between text-sm text-muted">
+                  <span>
+                    {properties.length} listing{properties.length === 1 ? "" : "s"} in view
+                    {truncated ? <span className="text-muted"> — zoom in to see all</span> : null}
+                  </span>
+                  <span
+                    aria-live="polite"
+                    className={`text-xs ${isFetching ? "text-muted" : "invisible"}`}
+                  >
+                    Updating…
+                  </span>
+                </div>
+                {error ? (
+                  <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-danger">
+                    <span>Could not update listings: {error}</span>
+                    <Button variant="link" size="sm" onClick={retry}>
+                      Try again
+                    </Button>
+                  </p>
+                ) : null}
+              </>
+            )}
+          </div>
+        ) : null}
+
+        <div className={`space-y-3 order-2 lg:order-none lg:col-start-1 ${mobileView === "list" ? "" : "hidden"} sm:block`}>
           {state === "loading" ? (
             <div className="grid gap-3 sm:grid-cols-2" aria-busy="true" aria-label="Loading listings">
               {Array.from({ length: 6 }, (_, i) => (
@@ -134,33 +187,8 @@ export default function BrowsePage() {
             </div>
           ) : null}
 
-          {state === "error" ? (
-            <EmptyState
-              tone="danger"
-              title="Couldn't load listings"
-              description={error}
-            />
-          ) : null}
-
           {state === "ready" ? (
             <>
-              <div className="flex items-baseline justify-between text-sm text-muted">
-                <span>
-                  {properties.length} listing{properties.length === 1 ? "" : "s"} in view
-                  {truncated ? <span className="text-muted"> — zoom in to see all</span> : null}
-                </span>
-                <span
-                  aria-live="polite"
-                  className={`text-xs ${isFetching ? "text-muted" : "invisible"}`}
-                >
-                  Updating…
-                </span>
-              </div>
-
-              {error ? (
-                <p className="text-sm text-danger">Could not update listings: {error}</p>
-              ) : null}
-
               {properties.length === 0 ? (
                 <EmptyState
                   title="No listings match your search"
@@ -195,7 +223,7 @@ export default function BrowsePage() {
           ) : null}
         </div>
 
-        <div className={`order-1 lg:order-none ${mobileView === "map" ? "" : "hidden"} sm:block lg:sticky lg:top-16 lg:h-[calc(100vh-6rem)]`}>
+        <div className={`order-1 lg:order-none lg:col-start-2 lg:row-span-2 lg:row-start-1 ${mobileView === "map" ? "" : "hidden"} sm:block lg:sticky lg:top-16 lg:h-[calc(100vh-6rem)]`}>
           <MapPanel
             properties={properties}
             activeId={activeId}

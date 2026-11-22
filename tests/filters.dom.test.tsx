@@ -74,6 +74,7 @@ describe("RoomsFilter studio", () => {
       <>
         <RoomsFilter filter={filter} onChange={setFilter} />
         <output data-testid="matched">{matched.join(",")}</output>
+        <output data-testid="rooms-filter">{JSON.stringify(filter)}</output>
       </>
     );
   }
@@ -97,6 +98,25 @@ describe("RoomsFilter studio", () => {
     expect(exact).not.toBeChecked();
     expect(exact).toBeEnabled();
     expect(screen.queryByText("Studios always match exactly.")).not.toBeInTheDocument();
+  });
+
+  it("drops exact-match when the bedroom selection is toggled off", () => {
+    render(<RoomsHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "2" }));
+    const exact = screen.getByRole("checkbox", { name: "Use exact match" });
+    fireEvent.click(exact);
+    expect(exact).toBeChecked();
+    expect(screen.getByTestId("rooms-filter")).toHaveTextContent(
+      JSON.stringify({ bedrooms: 2, bedroomsExact: true })
+    );
+
+    // Clicking the selected count is the clear gesture. Leaving bedroomsExact
+    // set makes the checkbox stay on and the next count an exact match, while
+    // the chip already reads as "no bedroom filter".
+    fireEvent.click(screen.getByRole("button", { name: "2" }));
+    expect(exact).not.toBeChecked();
+    expect(screen.getByTestId("rooms-filter")).toHaveTextContent("{}");
   });
 });
 
@@ -140,6 +160,23 @@ describe("PriceFilter commit", () => {
     fireEvent.change(minimum, { target: { value: "" } });
     expect(screen.getByTestId("applied").textContent).toBe(JSON.stringify({}));
     expect(screen.getByTestId("query").textContent).toBe("");
+  });
+
+  it("clears a rejected price draft that never became the applied filter", () => {
+    render(<BarHarness initial={{}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Price" }));
+    const maximum = screen.getByLabelText("Maximum");
+
+    fireEvent.change(maximum, { target: { value: "nope" } });
+    expect(screen.getByRole("alert")).toHaveTextContent(/finite number/i);
+    // Nothing was applied, so Clear has no rent keys to change — the draft
+    // still has to go, or the menu keeps showing an error for a filter that
+    // is not on.
+    fireEvent.click(screen.getByRole("button", { name: "Clear", exact: true }));
+
+    // Re-query: Clear remounts the inputs, so the pre-click element is gone.
+    expect(screen.getByLabelText("Maximum")).toHaveValue("");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
 

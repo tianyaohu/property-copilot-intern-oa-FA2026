@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { PropertyFilter } from "@/lib/types";
 import { Badge } from "@/components/ui/Badge";
 import { FilterMenu } from "@/components/filters/FilterMenu";
@@ -20,8 +21,9 @@ type FilterBarProps = {
 };
 
 /**
- * Controlled filter surface. Owns no filter state — every menu reads `filter`
- * and writes back through `onChange`, so all surfaces agree. Each chip is a
+ * Controlled filter surface. The rental filter lives in the parent — every menu
+ * reads `filter` and writes back through `onChange`, so all surfaces agree.
+ * `priceEpoch` is only a remount key for the price draft. Each chip is a
  * FilterMenu (the master "Filters" chip too); every change applies instantly.
  * Filters clear two ways: the inline ✕ on an active chip removes just that
  * dimension, and the trailing "Clear all" wipes everything.
@@ -31,12 +33,23 @@ export function FilterBar({ filter, onChange }: FilterBarProps) {
   const hasPrice = filter.minRent !== undefined || filter.maxRent !== undefined;
   const hasRooms = filter.bedrooms !== undefined || filter.bathrooms !== undefined;
   const hasTypes = (filter.propertyTypes?.length ?? 0) > 0;
+  // PriceFilter keeps a local draft. Clearing rent when nothing was applied
+  // does not change minRent/maxRent, so the draft would survive. Bumping this
+  // remounts the price inputs.
+  const [priceEpoch, setPriceEpoch] = useState(0);
+  const clearPriceDraft = () => setPriceEpoch((epoch) => epoch + 1);
 
-  const clearPrice = () => onChange({ ...filter, minRent: undefined, maxRent: undefined });
+  const clearPrice = () => {
+    onChange({ ...filter, minRent: undefined, maxRent: undefined });
+    clearPriceDraft();
+  };
   const clearRooms = () =>
     onChange({ ...filter, bedrooms: undefined, bedroomsExact: undefined, bathrooms: undefined });
   const clearTypes = () => onChange({ ...filter, propertyTypes: undefined });
-  const clearAll = () => onChange({});
+  const clearAll = () => {
+    onChange({});
+    clearPriceDraft();
+  };
 
   return (
     <div className="flex items-center gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -54,11 +67,11 @@ export function FilterBar({ filter, onChange }: FilterBarProps) {
         clearLabel="Clear all"
         chipClearable={false}
       >
-        <AllFiltersPanel filter={filter} onChange={onChange} />
+        <AllFiltersPanel key={priceEpoch} filter={filter} onChange={onChange} />
       </FilterMenu>
 
       <FilterMenu label={priceLabel(filter)} title="Price range" active={hasPrice} onClear={clearPrice}>
-        <PriceFilter filter={filter} onChange={onChange} />
+        <PriceFilter key={priceEpoch} filter={filter} onChange={onChange} />
       </FilterMenu>
 
       <FilterMenu
