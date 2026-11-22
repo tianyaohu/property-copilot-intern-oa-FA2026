@@ -43,6 +43,12 @@ function references, not a second copy. `lib/propertiesQuery.ts` imports
 `serializeFilter` from the shared codec. `app/`, `components/`, and `lib/`
 do not import `backend/`.
 
+The browse address bar uses the same codec (`lib/browseFilterUrl.ts`). On
+load the page parses `location.search` into the filter; when the filter
+changes it writes those params back with `history.replaceState`, so a reload
+restores min rent, max rent, bedrooms, and the other filter fields. The map
+viewport is not in that URL. The list request is still `buildPropertiesQuery`.
+
 Domain validation (`validateFilter`: negative bounds, inverted rent, a NaN
 handed in as a number) and every match predicate stay in the backend
 registry, in the same order as before. `parsePropertiesQuery` still runs
