@@ -1,5 +1,3 @@
-import { GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
-import { GEO_INDEX, getDocClient, tableName } from "./db";
 import {
   boundingBoxPrefixes,
   encodeGeohash,
@@ -8,6 +6,7 @@ import {
   isInBoundingBox,
   type BoundingBox
 } from "./geo";
+import { createDynamoPropertyStore, type PropertyStore } from "./property-store";
 import type { Property } from "./types";
 
 // Fan-out guard, sized from measurement rather than guesswork: a realistic
@@ -17,7 +16,7 @@ import type { Property } from "./types";
 // estimate to ~33M cells) — for the frontend and raw API callers alike.
 export const MAX_PREFIXES = 800;
 
-/** Raised before any DynamoDB work when a bbox would fan out too widely. */
+/** Raised before any store read when a bbox would fan out too widely. */
 export class ViewportTooLargeError extends Error {
   constructor(estimatedPrefixes: number) {
     super(
@@ -25,6 +24,14 @@ export class ViewportTooLargeError extends Error {
     );
     this.name = "ViewportTooLargeError";
   }
+}
+
+// Built once. Commands inside it read the table name and the client at send
+// time, so a late PROPERTIES_TABLE / DYNAMODB_ENDPOINT still applies.
+const dynamoStore = createDynamoPropertyStore();
+
+function storeOrDefault(store?: PropertyStore): PropertyStore {
+  return store ?? dynamoStore;
 }
 
 /** Compute the geo index attributes for an item from its coordinates. */
@@ -35,19 +42,26 @@ export function withGeoAttributes(
   return { ...property, geohash, geohashPrefix: geohashPrefix(geohash) };
 }
 
+/**
+ * Persist a listing. Geo keys are derived here, before the store sees the
+ * item, so a store implementation cannot write a row the geo index misses.
+ * `store` defaults to DynamoDB.
+ */
 export async function putProperty(
-  property: Omit<Property, "geohash" | "geohashPrefix">
+  property: Omit<Property, "geohash" | "geohashPrefix">,
+  store?: PropertyStore
 ): Promise<Property> {
   const item = withGeoAttributes(property);
-  await getDocClient().send(new PutCommand({ TableName: tableName(), Item: item }));
+  await storeOrDefault(store).put(item);
   return item;
 }
 
-export async function getPropertyById(id: string): Promise<Property | null> {
-  const result = await getDocClient().send(
-    new GetCommand({ TableName: tableName(), Key: { id } })
-  );
-  return (result.Item as Property | undefined) ?? null;
+/** Load one listing by id. `store` defaults to DynamoDB. */
+export async function getPropertyById(
+  id: string,
+  store?: PropertyStore
+): Promise<Property | null> {
+  return storeOrDefault(store).getById(id);
 }
 
 export function refineToBox(items: Property[], box: BoundingBox): Property[] {
@@ -59,40 +73,18 @@ export function dedupeById(items: Property[]): Property[] {
 }
 
 /**
- * Query one geo-index partition (a single geohash-prefix cell), following
- * LastEvaluatedKey — a ~4.9 km cell in a dense dataset can exceed DynamoDB's
- * 1 MB per-Query page.
- */
-async function queryPrefix(prefix: string): Promise<Property[]> {
-  const items: Property[] = [];
-  let lastKey: Record<string, unknown> | undefined;
-
-  do {
-    const result = await getDocClient().send(
-      new QueryCommand({
-        TableName: tableName(),
-        IndexName: GEO_INDEX,
-        KeyConditionExpression: "geohashPrefix = :p",
-        ExpressionAttributeValues: { ":p": prefix },
-        ExclusiveStartKey: lastKey
-      })
-    );
-    items.push(...((result.Items as Property[] | undefined) ?? []));
-    lastKey = result.LastEvaluatedKey as Record<string, unknown> | undefined;
-  } while (lastKey);
-
-  return items;
-}
-
-/**
  * Geospatial viewport query. Turns the box into the geohash prefixes that
- * cover it, Queries those geo-index partitions in parallel (each paginated),
- * then trims the prefix-cell overhang back to the exact box. The fan-out
- * guard runs on an arithmetic estimate so hostile boxes are rejected before
- * any cell strings are allocated. Attribute filters and the result cap are
- * composed by the caller (search.ts) — filters first, then the cap.
+ * cover it, reads those partitions in parallel (each store read follows its
+ * own pages), then trims the prefix-cell overhang back to the exact box. The
+ * fan-out guard runs on an arithmetic estimate so hostile boxes are rejected
+ * before any cell strings are allocated and before the store is touched.
+ * Attribute filters and the result cap are composed by the caller (search.ts)
+ * — filters first, then the cap. `store` defaults to DynamoDB.
  */
-export async function queryByBoundingBox(box: BoundingBox): Promise<Property[]> {
+export async function queryByBoundingBox(
+  box: BoundingBox,
+  store?: PropertyStore
+): Promise<Property[]> {
   const estimated = estimatePrefixCount(box);
   if (estimated > MAX_PREFIXES) {
     throw new ViewportTooLargeError(estimated);
@@ -100,7 +92,8 @@ export async function queryByBoundingBox(box: BoundingBox): Promise<Property[]> 
 
   const started = Date.now();
   const prefixes = boundingBoxPrefixes(box);
-  const perPrefix = await Promise.all(prefixes.map(queryPrefix));
+  const reader = storeOrDefault(store);
+  const perPrefix = await Promise.all(prefixes.map((prefix) => reader.readPartition(prefix)));
   const matches = refineToBox(dedupeById(perPrefix.flat()), box);
 
   console.log(
