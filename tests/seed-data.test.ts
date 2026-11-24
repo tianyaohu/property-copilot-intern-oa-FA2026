@@ -38,4 +38,40 @@ describe("seed data", () => {
     expect(withGeo.geohash).toBe(encodeGeohash(properties[0].lat, properties[0].lng));
     expect(withGeo.geohashPrefix).toBe(geohashPrefix(withGeo.geohash));
   });
+
+  test("studio descriptions use the Studio label, not a zero-bed count", () => {
+    const studios = properties.filter((p) => p.bedrooms === 0);
+    expect(studios.length).toBeGreaterThan(0);
+    for (const p of studios) {
+      expect(p.title.startsWith("Studio")).toBe(true);
+      expect(p.description).toContain("Studio");
+      expect(p.description).not.toContain("0 bed");
+    }
+    const twoBed = properties.find((p) => p.bedrooms === 2);
+    expect(twoBed?.description).toMatch(/2 bed/);
+  });
+
+  test("postal codes only use letters Canada Post assigns", () => {
+    // FSA letter excludes D,F,I,O,Q,U,W,Z. LDU letters exclude D,F,I,O,Q,U.
+    // The seeded FSAs are fixed (V6B, V6X, V5H, V3T); the LDU letter is random.
+    const code = /^[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z] \d[ABCEGHJ-NPRSTV-Z]\d$/;
+    const invalid = properties.filter((p) => !code.test(p.postalCode));
+    expect(invalid.map((p) => `${p.id} ${p.postalCode}`)).toEqual([]);
+  });
+
+  test("the catalogue coordinates stay put when only the postal alphabet changes", () => {
+    // lat/lng are drawn before the postal letter. A letter-table change must
+    // not consume an extra random number or every pin moves.
+    expect(properties[0]).toMatchObject({
+      id: "prop-001",
+      lat: 49.279597,
+      lng: -123.099552,
+      street: "5660 Granville St"
+    });
+    expect(properties[49]).toMatchObject({
+      id: "prop-050",
+      lat: 49.18616,
+      lng: -123.142858
+    });
+  });
 });

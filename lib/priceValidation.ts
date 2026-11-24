@@ -19,3 +19,27 @@ export function validatePriceRange(minRent?: number, maxRent?: number): string |
   const issue = rentRangeIssue(minRent, maxRent);
   return issue === null ? null : RENT_RANGE_MESSAGE[issue];
 }
+
+/**
+ * Which price inputs should be marked invalid. A bad minimum must not flag
+ * the maximum (and the reverse); an inverted pair flags both, matching the
+ * sentence that names both bounds.
+ */
+export function rentFieldsInvalid(
+  minRent?: number,
+  maxRent?: number
+): { minimum: boolean; maximum: boolean } {
+  const issue = rentRangeIssue(minRent, maxRent);
+  switch (issue) {
+    case "non-finite-min":
+    case "negative-min":
+      return { minimum: true, maximum: false };
+    case "non-finite-max":
+    case "negative-max":
+      return { minimum: false, maximum: true };
+    case "inverted":
+      return { minimum: true, maximum: true };
+    default:
+      return { minimum: false, maximum: false };
+  }
+}

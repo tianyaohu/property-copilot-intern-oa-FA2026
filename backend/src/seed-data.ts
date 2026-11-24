@@ -56,9 +56,14 @@ const CITY_DETAILS: Record<City, Omit<CitySpec, "name">> = {
 
 const CITY_SPECS: CitySpec[] = CITIES.map((name) => ({ name, ...CITY_DETAILS[name] }));
 
+// Local-delivery letters Canada Post actually assigns. D, F, I, O, Q, and U
+// are omitted; W and Z are legal here (they are not legal as the first letter
+// of a forward sortation area, which this generator does not randomize).
+const LDU_LETTERS = "ABCEGHJKLMNPRSTVWXYZ";
+
 function postalCode(fsa: string, rng: () => number): string {
   const digit = () => Math.floor(rng() * 10);
-  const letter = () => String.fromCharCode(65 + Math.floor(rng() * 26));
+  const letter = () => LDU_LETTERS[Math.floor(rng() * LDU_LETTERS.length)] ?? "A";
   return `${fsa} ${digit()}${letter()}${digit()}`;
 }
 
@@ -87,11 +92,12 @@ export function generateProperties(count = 50): SeedProperty[] {
 
     const id = `prop-${String(i + 1).padStart(3, "0")}`;
     const bedroomLabel = bedrooms === 0 ? "Studio" : `${bedrooms} Bed`;
+    const bedPhrase = bedrooms === 0 ? "Studio" : `${bedrooms} bed`;
 
     properties.push({
       id,
       title: `${bedroomLabel} ${propertyType} in ${city.name}`,
-      description: `A ${squareFeet} sq ft ${propertyType} near ${street} in ${city.name}, BC. ${bedrooms} bed / ${bathrooms} bath.`,
+      description: `A ${squareFeet} sq ft ${propertyType} near ${street} in ${city.name}, BC. ${bedPhrase} / ${bathrooms} bath.`,
       rent,
       bedrooms,
       bathrooms,

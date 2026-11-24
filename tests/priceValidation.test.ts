@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validatePriceRange } from "../lib/priceValidation";
+import { rentFieldsInvalid, validatePriceRange } from "../lib/priceValidation";
 
 // The frontend mirror of the backend's validateFilter rent rules. The backend
 // stays the source of truth, but this UX guard runs on every keystroke, so it
@@ -29,6 +29,18 @@ describe("validatePriceRange", () => {
 
   it("rejects an inverted range", () => {
     expect(validatePriceRange(3000, 2000)).toBe("Minimum rent can't be more than maximum rent.");
+  });
+
+  it("marks only the bound that failed, and both when the range is inverted", () => {
+    expect(rentFieldsInvalid(undefined, undefined)).toEqual({ minimum: false, maximum: false });
+    expect(rentFieldsInvalid(Number.NaN, 3000)).toEqual({ minimum: true, maximum: false });
+    expect(rentFieldsInvalid(1000, Number.POSITIVE_INFINITY)).toEqual({
+      minimum: false,
+      maximum: true
+    });
+    expect(rentFieldsInvalid(-1, undefined)).toEqual({ minimum: true, maximum: false });
+    expect(rentFieldsInvalid(undefined, -5)).toEqual({ minimum: false, maximum: true });
+    expect(rentFieldsInvalid(3000, 2000)).toEqual({ minimum: true, maximum: true });
   });
 
   it("rejects a non-finite bound", () => {
