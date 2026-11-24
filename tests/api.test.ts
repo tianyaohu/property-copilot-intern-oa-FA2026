@@ -80,4 +80,17 @@ describe("fetchProperty", () => {
     await expect(fetchProperty("prop-001")).resolves.toEqual(listing);
     expect(vi.mocked(fetch).mock.calls[0][0]).toBe(`${BASE}/properties/prop-001`);
   });
+
+  it("does not send Content-Type on GET, so the browser can skip the CORS preflight", async () => {
+    // application/json is not a CORS-safelisted content type. Sending it on a
+    // bodyless GET makes every listings and detail request preflight.
+    const fetchMock = vi.fn().mockResolvedValue(httpResult(200, { property: makeProperty() }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchProperty("prop-001");
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit | undefined;
+    const headers = new Headers(init?.headers);
+    expect(headers.has("Content-Type")).toBe(false);
+  });
 });

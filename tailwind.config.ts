@@ -28,6 +28,12 @@ const config: Config = {
       },
       boxShadow: {
         popover: "0 12px 32px -8px rgb(0 0 0 / 0.18)"
+      },
+      // Tailwind 3 ships aria-checked/disabled/expanded/… but not aria-invalid.
+      // Without this value, `aria-invalid:*` classes are extracted and then
+      // discarded, so an invalid price field never paints the danger border.
+      aria: {
+        invalid: 'invalid="true"'
       }
     }
   },

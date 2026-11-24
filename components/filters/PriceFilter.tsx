@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { validatePriceRange } from "@/lib/priceValidation";
+import { useEffect, useId, useState } from "react";
+import { rentFieldsInvalid, validatePriceRange } from "@/lib/priceValidation";
 import { Input } from "@/components/ui/Input";
 import type { FilterBodyProps } from "@/components/filters/filterOptions";
 
@@ -48,6 +48,8 @@ export function PriceFilter({ filter, onChange }: FilterBodyProps) {
   const minRent = numberOrUndefined(minText);
   const maxRent = numberOrUndefined(maxText);
   const error = validatePriceRange(minRent, maxRent);
+  const invalid = rentFieldsInvalid(minRent, maxRent);
+  const errorId = useId();
 
   const commit = (nextMin: string, nextMax: string) => {
     const min = numberOrUndefined(nextMin);
@@ -68,7 +70,8 @@ export function PriceFilter({ filter, onChange }: FilterBodyProps) {
           autoComplete="off"
           placeholder="Any"
           value={minText}
-          aria-invalid={error !== null}
+          aria-invalid={invalid.minimum || undefined}
+          aria-describedby={invalid.minimum ? errorId : undefined}
           onChange={(e) => {
             setMinText(e.target.value);
             commit(e.target.value, maxText);
@@ -81,7 +84,8 @@ export function PriceFilter({ filter, onChange }: FilterBodyProps) {
           autoComplete="off"
           placeholder="Any"
           value={maxText}
-          aria-invalid={error !== null}
+          aria-invalid={invalid.maximum || undefined}
+          aria-describedby={invalid.maximum ? errorId : undefined}
           onChange={(e) => {
             setMaxText(e.target.value);
             commit(minText, e.target.value);
@@ -89,7 +93,7 @@ export function PriceFilter({ filter, onChange }: FilterBodyProps) {
         />
       </div>
       {error ? (
-        <p role="alert" className="text-xs text-danger">
+        <p id={errorId} role="alert" className="text-xs text-danger">
           {error}
         </p>
       ) : null}

@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { forwardRef, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 type ChipProps = {
@@ -23,6 +23,9 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(function Chip(
   ref
 ) {
   const showClear = active && Boolean(onClear);
+  const labelRef = useRef<HTMLButtonElement>(null);
+  const clearName =
+    typeof children === "string" && children.trim() !== "" ? `Clear ${children}` : "Clear filter";
 
   return (
     <div
@@ -42,14 +45,20 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(function Chip(
           showClear ? "pl-3 pr-1.5" : "px-3"
         )}
         {...buttonProps}
+        ref={labelRef}
       >
         {children}
       </button>
       {showClear ? (
         <button
           type="button"
-          aria-label="Clear filter"
-          onClick={onClear}
+          aria-label={clearName}
+          onClick={() => {
+            onClear?.();
+            // Clearing drops `active`, which unmounts this button. Move focus
+            // to the trigger that stays, or the keyboard user lands on <body>.
+            labelRef.current?.focus();
+          }}
           className="mr-1 flex h-5 w-5 items-center justify-center rounded-full text-accent-fg/80 transition-colors hover:bg-accent-fg/20 hover:text-accent-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-fg max-sm:h-11 max-sm:w-11"
         >
           <svg viewBox="0 0 14 14" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

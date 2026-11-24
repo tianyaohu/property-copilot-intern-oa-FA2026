@@ -8,10 +8,9 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4
  * (lib/propertiesQuery.ts) turns the throw and AbortError into a typed result.
  */
 export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    signal
-  });
+  // No Content-Type: a GET has no body, and application/json is not a
+  // CORS-safelisted request header, so sending it preflights every call.
+  const response = await fetch(`${API_BASE_URL}${path}`, { signal });
 
   // Non-JSON bodies become null so the status check below still produces a
   // useful error — but an abort mid-body-read must stay an AbortError, or a

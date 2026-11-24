@@ -17,7 +17,7 @@ export function Input({ label, className, ...props }: InputProps) {
         // text-base (16px) below `sm` so iOS Safari does not zoom the page on
         // focus — that zoom is a viewport change, and it used to dismiss the
         // filter popover mid-keystroke. h-11 is the 44px touch minimum.
-        "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-fg placeholder:text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent sm:h-9 sm:px-2 sm:text-sm",
+        "h-11 w-full rounded-md border border-border bg-surface px-3 text-base text-fg placeholder:text-muted focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent aria-invalid:border-danger aria-invalid:focus:border-danger aria-invalid:focus:ring-danger sm:h-9 sm:px-2 sm:text-sm",
         className
       )}
       {...props}

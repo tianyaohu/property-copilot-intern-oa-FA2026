@@ -1,11 +1,37 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CAD } from "@/lib/format";
 import type { Property } from "@/lib/types";
 
 function bedroomLabel(bedrooms: number): string {
   return bedrooms === 0 ? "Studio" : `${bedrooms} bd`;
+}
+
+function rentLabel(rent: number): string {
+  return Number.isFinite(rent) ? `${CAD.format(rent)}/mo` : "Rent unavailable";
+}
+
+function ListingPhoto({ title, src }: { title: string; src: string | undefined }) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  if (!src || failedSrc === src) {
+    return (
+      <div className="flex h-40 w-full items-center justify-center bg-fg/5 text-sm text-muted">
+        <span className="sr-only">{title}. </span>
+        No photo
+      </div>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={title}
+      className="h-40 w-full object-cover"
+      loading="lazy"
+      onError={() => setFailedSrc(src)}
+    />
+  );
 }
 
 type PropertyCardProps = {
@@ -68,24 +94,12 @@ export function PropertyCard({ property, active, onSelect, syncWithList, layoutK
     );
   }, [syncWithList, active, layoutKey]);
 
-  return (
-    <article
-      ref={ref}
-      className={`overflow-hidden rounded-lg border bg-surface transition ${
-        active ? "border-accent ring-1 ring-accent" : "border-border"
-      } ${onSelect ? "cursor-pointer hover:border-fg/30" : ""}`}
-      onClick={onSelect ? () => onSelect(property.id) : undefined}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={property.images[0]}
-        alt={property.title}
-        className="h-40 w-full object-cover"
-        loading="lazy"
-      />
+  const details = (
+    <>
+      <ListingPhoto title={property.title} src={property.images?.[0]} />
       <div className="space-y-1 p-3">
         <div className="flex items-baseline justify-between gap-2">
-          <p className="font-semibold text-fg">{CAD.format(property.rent)}/mo</p>
+          <p className="font-semibold text-fg">{rentLabel(property.rent)}</p>
           <span className="text-xs uppercase tracking-wide text-muted">
             {property.propertyType}
           </span>
@@ -97,6 +111,28 @@ export function PropertyCard({ property, active, onSelect, syncWithList, layoutK
           {property.street}, {property.city}
         </p>
       </div>
+    </>
+  );
+
+  return (
+    <article
+      ref={ref}
+      className={`overflow-hidden rounded-lg border bg-surface transition ${
+        active ? "border-accent ring-1 ring-accent" : "border-border"
+      } ${onSelect ? "hover:border-fg/30" : ""}`}
+    >
+      {onSelect ? (
+        <button
+          type="button"
+          aria-pressed={Boolean(active)}
+          onClick={() => onSelect(property.id)}
+          className="block w-full cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent"
+        >
+          {details}
+        </button>
+      ) : (
+        details
+      )}
     </article>
   );
 }
