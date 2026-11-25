@@ -8,10 +8,10 @@ import type { FilterBodyProps } from "@/components/filters/filterOptions";
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="space-y-2 border-t border-border pt-4 first:border-t-0 first:pt-0">
-      <p className="text-sm font-semibold text-fg">{title}</p>
+    <div className="space-y-2 border-t border-border pt-4 first:border-t-0 first:pt-0">
+      <h3 className="text-sm font-semibold text-fg">{title}</h3>
       {children}
-    </section>
+    </div>
   );
 }
 

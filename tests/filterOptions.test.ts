@@ -38,7 +38,9 @@ describe("roomsLabel", () => {
   it("shows a bedroom minimum, an exact match, and the studio special-case", () => {
     expect(roomsLabel({ bedrooms: 2 })).toBe("2+ bd");
     expect(roomsLabel({ bedrooms: 2, bedroomsExact: true })).toBe("2 bd");
-    expect(roomsLabel({ bedrooms: 0 })).toBe("Studio bd");
+    // "Studio" already means zero bedrooms. Appending "bd" produced "Studio bd".
+    expect(roomsLabel({ bedrooms: 0 })).toBe("Studio");
+    expect(roomsLabel({ bedrooms: 0, bathrooms: 2 })).toBe("Studio, 2+ ba");
   });
 
   it("combines bedrooms with a bathroom minimum", () => {
@@ -54,6 +56,13 @@ describe("typeLabel", () => {
   it("names a single type and overflows the rest", () => {
     expect(typeLabel({ propertyTypes: ["condo"] })).toBe("Condo");
     expect(typeLabel({ propertyTypes: ["apartment", "condo", "house"] })).toBe("Apartment +2");
+  });
+
+  it("names the same set of types no matter which one was checked first", () => {
+    // Click order used to win, so House-then-Apartment read "House +1"
+    // while Apartment-then-House read "Apartment +1".
+    expect(typeLabel({ propertyTypes: ["house", "apartment"] })).toBe("Apartment +1");
+    expect(typeLabel({ propertyTypes: ["townhouse", "condo", "house"] })).toBe("Condo +2");
   });
 });
 
@@ -72,5 +81,13 @@ describe("priceLabel", () => {
     expect(floor).toContain("+");
 
     expect(priceLabel({ maxRent: 3000 })).toContain("Up to");
+  });
+
+  it("shows one amount when the minimum and maximum are the same", () => {
+    const label = priceLabel({ minRent: 2000, maxRent: 2000 });
+    expect(label).toContain("2,000");
+    // "$2,000 – $2,000" names the same dollar twice.
+    expect(label.match(/2,000/g)).toHaveLength(1);
+    expect(label).not.toContain("–");
   });
 });

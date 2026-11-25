@@ -3,7 +3,7 @@ import { cn } from "@/lib/cn";
 /** A single shimmering placeholder block. Compose these to mirror a component's
  * layout while its data loads. */
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={cn("animate-pulse rounded-md bg-fg/10", className)} />;
+  return <div className={cn("animate-pulse rounded-md bg-fg/10 motion-reduce:animate-none", className)} />;
 }
 
 /** Placeholder that matches PropertyCard's shape, so the loading grid holds the

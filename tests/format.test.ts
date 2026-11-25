@@ -20,6 +20,18 @@ describe("formatCompactRent", () => {
   it("rounds to the nearest hundred before formatting", () => {
     expect(formatCompactRent(2950)).toBe("3k"); // 2950 -> 29.5 -> 30 -> "3k"
   });
+
+  it("uses the compact form when a sub-1000 rent rounds up to 1000", () => {
+    // 999.5 rounds to the same dollar as 1000, which is "1k". The old
+    // threshold ran before rounding, so the pin read "1000" instead.
+    expect(formatCompactRent(999.5)).toBe("1k");
+    expect(formatCompactRent(999.6)).toBe("1k");
+  });
+
+  it("does not emit NaNk or Infinityk for a non-finite rent", () => {
+    expect(formatCompactRent(Number.NaN)).toBe("—");
+    expect(formatCompactRent(Number.POSITIVE_INFINITY)).toBe("—");
+  });
 });
 
 describe("CAD", () => {

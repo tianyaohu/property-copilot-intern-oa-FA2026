@@ -61,6 +61,7 @@ export function countActiveFilters(filter: PropertyFilter): number {
 export function priceLabel({ minRent, maxRent }: PropertyFilter): string {
   if (minRent === undefined && maxRent === undefined) return "Price";
   if (minRent !== undefined && maxRent !== undefined) {
+    if (minRent === maxRent) return CAD.format(minRent);
     return `${CAD.format(minRent)} – ${CAD.format(maxRent)}`;
   }
   return minRent !== undefined ? `${CAD.format(minRent)}+` : `Up to ${CAD.format(maxRent as number)}`;
@@ -71,9 +72,14 @@ export function roomsLabel({ bedrooms, bedroomsExact, bathrooms }: PropertyFilte
   const parts: string[] = [];
   if (bedrooms !== undefined) {
     // Studio is an exact 0-bedroom match (see the bedrooms predicate), so the
-    // chip says "Studio" rather than "0+" — a minimum of 0 would be every listing.
-    const label = bedrooms === 0 ? "Studio" : bedroomsExact ? `${bedrooms}` : `${bedrooms}+`;
-    parts.push(`${label} bd`);
+    // chip says "Studio" rather than "0+" or "Studio bd" — a minimum of 0
+    // would be every listing, and "bd" repeats what Studio already means.
+    if (bedrooms === 0) {
+      parts.push("Studio");
+    } else {
+      const label = bedroomsExact ? `${bedrooms}` : `${bedrooms}+`;
+      parts.push(`${label} bd`);
+    }
   }
   if (bathrooms !== undefined) parts.push(`${bathrooms}+ ba`);
   return parts.join(", ");
@@ -81,7 +87,13 @@ export function roomsLabel({ bedrooms, bedroomsExact, bathrooms }: PropertyFilte
 
 export function typeLabel({ propertyTypes }: PropertyFilter): string {
   if (!propertyTypes?.length) return "Type";
-  const [first, ...rest] = propertyTypes;
+  // Chip text follows the checklist order, not the order the boxes were
+  // ticked, so the same set always reads the same way.
+  const rank = new Map(PROPERTY_TYPES.map((type, index) => [type.value, index]));
+  const ordered = [...propertyTypes].sort(
+    (a, b) => (rank.get(a) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b) ?? Number.MAX_SAFE_INTEGER)
+  );
+  const [first, ...rest] = ordered;
   const label = PROPERTY_TYPES.find((t) => t.value === first)?.label ?? first;
   return rest.length ? `${label} +${rest.length}` : label;
 }

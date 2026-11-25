@@ -47,9 +47,16 @@ export function Popover({ triggerRef, onClose, labelledBy, width = DEFAULT_PANEL
     setLayout({ top, left, maxHeight: window.innerHeight - top - VIEWPORT_MARGIN });
   }, [triggerRef, width]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    // The panel is not in the DOM until `layout` is measured, so a mount
+    // effect runs while the ref is still null and focus never moves. Keyboard
+    // users then tab to the next chip and never reach the fields. This has to
+    // be a layout effect: the measurement update above flushes before a
+    // passive effect, and that passive effect would still close over the
+    // empty layout.
+    if (!layout) return;
     panelRef.current?.focus();
-  }, []);
+  }, [layout]);
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -100,7 +107,7 @@ export function Popover({ triggerRef, onClose, labelledBy, width = DEFAULT_PANEL
       role="dialog"
       aria-labelledby={labelledBy}
       style={{ position: "fixed", top: layout.top, left: layout.left, width, maxHeight: layout.maxHeight }}
-      className="z-50 flex flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-popover"
+      className="z-50 flex flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-popover outline-none"
     >
       {children}
     </div>
