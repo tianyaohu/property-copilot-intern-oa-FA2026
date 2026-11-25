@@ -41,7 +41,7 @@ describe("filterProperties", () => {
   test("studio (0 bedrooms) matches only studios, not every listing", () => {
     // A minimum of 0 is true for every listing (bedroom counts are never
     // negative). The Studio control sends bedrooms=0 without bedroomsExact,
-    // and the chip labels that state "Studio bd", so the predicate has to
+    // and the chip labels that state "Studio", so the predicate has to
     // treat 0 as an exact studio match — including when exact is explicitly
     // false. Otherwise the filter looks active and changes nothing.
     const items = [

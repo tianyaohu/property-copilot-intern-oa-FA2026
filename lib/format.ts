@@ -11,8 +11,12 @@ export const CAD = new Intl.NumberFormat("en-CA", {
  * marker's own pill styling already signals "this is a price."
  */
 export function formatCompactRent(rent: number): string {
-  if (rent < 1000) return String(Math.round(rent));
-  const roundedTenths = Math.round(rent / 100) / 10; // one decimal, in thousands
+  if (!Number.isFinite(rent)) return "—";
+  // Round to a whole dollar first. Checking `rent < 1000` before rounding
+  // turned 999.5 into "1000" while 1000 became "1k".
+  const roundedDollars = Math.round(rent);
+  if (roundedDollars < 1000) return String(roundedDollars);
+  const roundedTenths = Math.round(roundedDollars / 100) / 10; // one decimal, in thousands
   const label = Number.isInteger(roundedTenths) ? String(roundedTenths) : roundedTenths.toFixed(1);
   return `${label}k`;
 }

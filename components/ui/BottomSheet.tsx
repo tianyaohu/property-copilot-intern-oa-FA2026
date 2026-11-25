@@ -84,7 +84,7 @@ export function BottomSheet({ onClose, labelledBy, children }: BottomSheetProps)
 
   return createPortal(
     <div className="fixed inset-0 z-50">
-      <button type="button" aria-label="Dismiss" className="absolute inset-0 bg-fg/40" onClick={onClose} />
+      <button type="button" aria-label="Dismiss" className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div
         ref={panelRef}
         tabIndex={-1}
