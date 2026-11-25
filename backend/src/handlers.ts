@@ -1,25 +1,12 @@
-import { handleApiRequest, type HttpResult } from "./http";
-
-/**
- * Minimal shape of an API Gateway HTTP API (payload format 2.0) event. Inlined
- * to avoid pulling in @types/aws-lambda for a couple of fields.
- */
-type HttpApiEvent = {
-  rawPath?: string;
-  queryStringParameters?: Record<string, string | undefined> | null;
-  requestContext?: { http?: { method?: string } };
-};
+import { handleHttpApiEvent, type HttpResult } from "./http";
+import type { HttpApiEvent } from "./api-request";
 
 /**
  * AWS Lambda entry point behind API Gateway (HTTP API, payload format 2.0).
- * Maps the event onto the shared request. Serialization (CORS, JSON, OPTIONS,
- * 500) lives in handleApiRequest, which the local dev server also calls.
+ * Adapts the event, then serializes through handleApiRequest — the same
+ * function the local server uses. CORS, JSON, OPTIONS, the error envelope,
+ * and 500s live there, not here.
  */
-export async function handler(event: HttpApiEvent): Promise<HttpResult> {
-  const method = event.requestContext?.http?.method ?? "GET";
-  return handleApiRequest({
-    method,
-    path: event.rawPath ?? "/",
-    query: event.queryStringParameters ?? {}
-  });
+export function handler(event: HttpApiEvent): Promise<HttpResult> {
+  return handleHttpApiEvent(event);
 }
