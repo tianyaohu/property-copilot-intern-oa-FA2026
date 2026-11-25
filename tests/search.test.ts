@@ -1,11 +1,16 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { ViewportTooLargeError } from "../backend/src/properties";
-import { MAX_RESULTS, capResults, searchProperties } from "../backend/src/search";
+import {
+  MAX_RESULTS,
+  capResults,
+  searchProperties,
+  type PropertySearch
+} from "../backend/src/search";
 import { makeProperty as property } from "./fixtures";
 
-// searchProperties is the repository boundary: geo query in, filtered and
-// capped listings out. Mock only the DynamoDB read. Filter predicates,
-// including studio-as-exact, run for real.
+// searchProperties composes the geo read, attribute filters, and the cap.
+// Mock only the DynamoDB read. Filter predicates, including studio-as-exact,
+// run for real. The fan-out guard is a result; other read failures throw.
 vi.mock("../backend/src/properties", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../backend/src/properties")>();
   return {
@@ -17,6 +22,13 @@ vi.mock("../backend/src/properties", async (importOriginal) => {
 const { queryByBoundingBox } = vi.mocked(await import("../backend/src/properties"));
 
 const BOX = { minLat: 49, minLng: -124, maxLat: 50, maxLng: -122 };
+
+function listings(result: PropertySearch) {
+  if (!result.ok) {
+    throw new Error(`expected listings, got ${result.reason}`);
+  }
+  return result;
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -44,7 +56,7 @@ describe("searchProperties", () => {
       property({ id: "pricey", rent: 3500 })
     ]);
 
-    const result = await searchProperties(BOX, { minRent: 2000 });
+    const result = listings(await searchProperties(BOX, { minRent: 2000 }));
 
     expect(queryByBoundingBox).toHaveBeenCalledWith(BOX);
     expect(result.properties.map((item) => item.id)).toEqual(["pricey"]);
@@ -57,7 +69,7 @@ describe("searchProperties", () => {
       property({ id: "one-bed", bedrooms: 1 })
     ]);
 
-    const result = await searchProperties(BOX, { bedrooms: 0 });
+    const result = listings(await searchProperties(BOX, { bedrooms: 0 }));
 
     expect(result.properties.map((item) => item.id)).toEqual(["studio"]);
   });
@@ -69,7 +81,7 @@ describe("searchProperties", () => {
     ];
     queryByBoundingBox.mockResolvedValue(inView);
 
-    const result = await searchProperties(BOX, { minRent: 2000 });
+    const result = listings(await searchProperties(BOX, { minRent: 2000 }));
 
     expect(result.properties).toHaveLength(MAX_RESULTS);
     expect(result.truncated).toBe(true);
@@ -81,16 +93,19 @@ describe("searchProperties", () => {
       Array.from({ length: 250 }, (_, i) => property({ id: `p-${i}`, rent: i < 240 ? 1000 : 3000 }))
     );
 
-    const result = await searchProperties(BOX, { minRent: 2000 });
+    const result = listings(await searchProperties(BOX, { minRent: 2000 }));
 
     expect(result.properties).toHaveLength(10);
     expect(result.truncated).toBe(false);
   });
 
-  test("ViewportTooLargeError propagates for the HTTP layer to map", async () => {
+  test("the fan-out guard is a refusal, not a thrown error", async () => {
     queryByBoundingBox.mockRejectedValue(new ViewportTooLargeError(33_000_000));
 
-    await expect(searchProperties(BOX, {})).rejects.toThrow(ViewportTooLargeError);
+    await expect(searchProperties(BOX, {})).resolves.toEqual({
+      ok: false,
+      reason: "viewport-too-large"
+    });
   });
 
   test("unexpected repository errors propagate", async () => {

@@ -1,18 +1,11 @@
+import type { ApiRequest } from "./api-request";
+import { clientError, ok, type ApiResponse } from "./api-response";
 import { parsePropertiesQuery } from "./properties-query";
-import { getPropertyById, ViewportTooLargeError } from "./properties";
+import { getPropertyById } from "./properties";
 import { searchProperties } from "./search";
 import { propertiesListResponse, propertyResponse } from "./types";
 
-export type ApiRequest = {
-  method: string;
-  path: string;
-  query: Record<string, string | undefined>;
-};
-
-export type ApiResponse = {
-  statusCode: number;
-  body: unknown;
-};
+export type { ApiRequest, ApiResponse };
 
 /**
  * Framework-agnostic request router shared by the Lambda handler (production)
@@ -21,11 +14,11 @@ export type ApiResponse = {
  */
 export async function route(req: ApiRequest): Promise<ApiResponse> {
   if (req.method !== "GET") {
-    return { statusCode: 405, body: { error: "Method not allowed" } };
+    return clientError(405, "Method not allowed");
   }
 
   if (req.path === "/health") {
-    return { statusCode: 200, body: { ok: true } };
+    return ok({ ok: true });
   }
 
   // GET /properties/:id
@@ -39,15 +32,15 @@ export async function route(req: ApiRequest): Promise<ApiResponse> {
       id = decodeURIComponent(detailMatch[1]);
     } catch (err) {
       if (err instanceof URIError) {
-        return { statusCode: 400, body: { error: "Invalid property id" } };
+        return clientError(400, "Invalid property id");
       }
       throw err;
     }
     const property = await getPropertyById(id);
     if (!property) {
-      return { statusCode: 404, body: { error: "Property not found" } };
+      return clientError(404, "Property not found");
     }
-    return { statusCode: 200, body: propertyResponse(property) };
+    return ok(propertyResponse(property));
   }
 
   // GET /properties
@@ -65,26 +58,19 @@ export async function route(req: ApiRequest): Promise<ApiResponse> {
   if (req.path === "/properties") {
     const parsed = parsePropertiesQuery(req.query);
     if (!parsed.ok) {
-      return { statusCode: 400, body: { error: parsed.error } };
+      return clientError(400, parsed.error);
     }
 
-    try {
-      const { properties, truncated } = await searchProperties(parsed.box, parsed.filter);
-      return {
-        statusCode: 200,
-        body: propertiesListResponse(properties, truncated)
-      };
-    } catch (err) {
-      // The frontend no longer caps how far a user can pan/zoom out (no
-      // minZoom, no maxBounds) — zooming out toward the whole world is a
-      // normal way to trigger this. This guard is now the real, user-facing
-      // limiter it was always meant to be, not just a raw-API safety net.
-      if (err instanceof ViewportTooLargeError) {
-        return { statusCode: 400, body: { error: "Viewport too large; zoom in" } };
-      }
-      throw err;
+    const found = await searchProperties(parsed.box, parsed.filter);
+    // The frontend no longer caps how far a user can pan/zoom out, so a
+    // world-scale box is a normal request. The fan-out guard is the limiter,
+    // and it arrives as a value — a thrown error is a failed read, which the
+    // HTTP edge answers as 500.
+    if (!found.ok) {
+      return clientError(400, "Viewport too large; zoom in");
     }
+    return ok(propertiesListResponse(found.properties, found.truncated));
   }
 
-  return { statusCode: 404, body: { error: "Not found" } };
+  return clientError(404, "Not found");
 }

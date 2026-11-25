@@ -1,7 +1,8 @@
 /**
  * Backend door to the shared wire contract. Import from here inside
- * `backend/` so call sites stay on a local path; the definitions live in
- * `shared/contract.ts` and are the same objects the client re-exports.
+ * `backend/` so call sites stay on a local path. Listing shapes live in
+ * `shared/contract.ts` (the same objects the client re-exports). The error
+ * envelope lives in `shared/apiError.ts`.
  */
 export type {
   City,
@@ -13,6 +14,8 @@ export type {
   RentRangeIssue
 } from "../../shared/contract";
 
+export type { ApiErrorBody } from "../../shared/apiError";
+
 export {
   CITIES,
   PROPERTY_TYPES,
@@ -21,3 +24,5 @@ export {
   propertyResponse,
   rentRangeIssue
 } from "../../shared/contract";
+
+export { apiErrorBody, isApiErrorBody } from "../../shared/apiError";

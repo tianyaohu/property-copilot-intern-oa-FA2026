@@ -1,6 +1,6 @@
 import { filterProperties } from "./filter";
 import type { BoundingBox } from "./geo";
-import { queryByBoundingBox } from "./properties";
+import { queryByBoundingBox, ViewportTooLargeError } from "./properties";
 import type { Property, PropertyFilter } from "./types";
 
 // Cap on items returned per query; `truncated` tells the client to zoom in
@@ -29,14 +29,30 @@ export function capResults(properties: Property[]): CappedResults {
 }
 
 /**
+ * A viewport search. The fan-out guard is an expected refusal: the caller
+ * maps `viewport-too-large` to a 400. A DynamoDB failure still throws, and
+ * only the HTTP edge turns that into a 500.
+ */
+export type PropertySearch =
+  | ({ ok: true } & CappedResults)
+  | { ok: false; reason: "viewport-too-large" };
+
+/**
  * Listings inside a viewport. Reads the geo index, applies attribute
- * filters, then caps. ViewportTooLargeError and other repository failures
- * propagate; the HTTP layer maps the fan-out guard to a 400.
+ * filters, then caps. The fan-out guard is caught here so the router does
+ * not special-case a repository exception; every other failure propagates.
  */
 export async function searchProperties(
   box: BoundingBox,
   filter: PropertyFilter
-): Promise<CappedResults> {
-  const inView = await queryByBoundingBox(box);
-  return capResults(filterProperties(inView, filter));
+): Promise<PropertySearch> {
+  try {
+    const inView = await queryByBoundingBox(box);
+    return { ok: true, ...capResults(filterProperties(inView, filter)) };
+  } catch (error) {
+    if (error instanceof ViewportTooLargeError) {
+      return { ok: false, reason: "viewport-too-large" };
+    }
+    throw error;
+  }
 }
