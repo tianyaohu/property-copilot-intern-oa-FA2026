@@ -7,6 +7,20 @@ import { FilterBar } from "@/components/filters/FilterBar";
 import { MOBILE_SHEET_MEDIA } from "@/lib/mobileViewport";
 import type { PropertyFilter } from "@/lib/types";
 
+/** Evaluate the sheet media query against a fake viewport. jsdom has no
+ * matchMedia, and a hard-coded `width <= 639` would stay true after the query
+ * grows a height clause — so this parses the query the app actually passes. */
+function matchesSheetQuery(query: string, width: number, height: number): boolean {
+  return query.split(",").some((part) => {
+    const feature = part.trim();
+    const maxWidth = feature.match(/^\(max-width:\s*(\d+(?:\.\d+)?)px\)$/);
+    if (maxWidth) return width <= Number(maxWidth[1]);
+    const maxHeight = feature.match(/^\(max-height:\s*(\d+(?:\.\d+)?)px\)$/);
+    if (maxHeight) return height <= Number(maxHeight[1]);
+    return false;
+  });
+}
+
 // A phone-sized layout viewport, and a visual viewport the software keyboard
 // can shrink. jsdom has neither matchMedia nor visualViewport.
 function installViewport(width: number, height: number) {
@@ -35,7 +49,7 @@ function installViewport(width: number, height: number) {
   Object.defineProperty(window, "matchMedia", {
     configurable: true,
     value: (query: string) => ({
-      matches: query === MOBILE_SHEET_MEDIA && width <= 639,
+      matches: query === MOBILE_SHEET_MEDIA && matchesSheetQuery(query, width, height),
       media: query,
       addEventListener() {},
       removeEventListener() {},
@@ -128,5 +142,88 @@ describe("mobile filter sheet", () => {
 
     fireEvent(window, new Event("resize"));
     expect(screen.queryByRole("dialog", { name: "Price range" })).not.toBeInTheDocument();
+  });
+
+  it("opens price as a sheet on a landscape phone and keeps 16px fields", () => {
+    // iPhone SE landscape is 667×375: wider than `sm`, so the old rule used the
+    // anchored popover and `sm:text-sm` (14px). iOS zooms on that focus, the
+    // zoom fires `resize`, and the popover treats resize as dismiss.
+    installViewport(667, 375);
+    render(<BarHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Price" }));
+    const dialog = screen.getByRole("dialog", { name: "Price range" });
+
+    expect(dialog).toHaveAttribute("data-presentation", "sheet");
+    const fields = dialog.querySelector(".overflow-y-auto");
+    expect(fields?.className).toContain("[@media(max-height:500px)]:[&_input[type=text]]:text-base");
+    expect(fields?.className).toContain("[@media(max-height:500px)]:[&_input[type=text]]:h-11");
+    expect(fields?.className).toContain("[@media(max-height:500px)]:[&_button]:min-h-11");
+    expect(fields?.className).toContain("[@media(max-height:500px)]:[&_label]:min-h-11");
+
+    fireEvent(window, new Event("resize"));
+    expect(screen.getByRole("dialog", { name: "Price range" })).toBeInTheDocument();
+  });
+
+  it("does not lift the sheet when the page rubber-bands past the top", () => {
+    const visualViewport = installViewport(390, 844);
+    render(<BarHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Price" }));
+    const dialog = () => screen.getByRole("dialog", { name: "Price range" });
+
+    // Full screen: visible height minus the 16px gap. The 160px floor must
+    // not change this.
+    expect(dialog().style.maxHeight).toBe("828px");
+
+    visualViewport.offsetTop = -48;
+    act(() => visualViewport.dispatch("scroll"));
+
+    expect(dialog()).toHaveAttribute("data-keyboard-inset", "0");
+    expect(dialog().style.bottom).toBe("0px");
+  });
+
+  it("shrinks the sheet to a short keyboard instead of a 160px floor", () => {
+    const visualViewport = installViewport(390, 844);
+    render(<BarHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Price" }));
+    const dialog = () => screen.getByRole("dialog", { name: "Price range" });
+
+    // A landscape keyboard can leave ~150px. max(160, 150-16) is 160, which
+    // is taller than the visible area, so the title sits above the screen.
+    visualViewport.height = 150;
+    act(() => visualViewport.dispatch("resize"));
+
+    expect(dialog().style.maxHeight).toBe("134px");
+  });
+
+  it("returns focus to the chip when the sheet scrim is dismissed", () => {
+    installViewport(390, 844);
+    render(<BarHarness />);
+    const price = screen.getByRole("button", { name: "Price" });
+    fireEvent.click(price);
+
+    const dismiss = screen.getByRole("button", { name: "Dismiss" });
+    dismiss.focus();
+    fireEvent.click(dismiss);
+
+    expect(screen.queryByRole("dialog", { name: "Price range" })).not.toBeInTheDocument();
+    expect(price).toHaveFocus();
+  });
+
+  it("still lifts the sheet when the visual viewport has scrolled down", () => {
+    const visualViewport = installViewport(390, 844);
+    render(<BarHarness />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Price" }));
+    visualViewport.offsetTop = 80;
+    visualViewport.height = 420;
+    act(() => visualViewport.dispatch("resize"));
+
+    const dialog = screen.getByRole("dialog", { name: "Price range" });
+    // 844 - 80 - 420 = 344. A positive offset is the keyboard-plus-scroll case.
+    expect(dialog).toHaveAttribute("data-keyboard-inset", "344");
+    expect(dialog.style.bottom).toBe("344px");
   });
 });

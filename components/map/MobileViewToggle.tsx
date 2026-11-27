@@ -13,6 +13,9 @@ type Props = { value: "map" | "list"; onChange: (v: "map" | "list") => void };
 export function MobileViewToggle({ value, onChange }: Props) {
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-3 pt-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:hidden">
+      <span className="sr-only" aria-live="polite">
+        {value === "map" ? "Showing the map" : "Showing the list"}
+      </span>
       <div
         role="group"
         aria-label="Map or list"

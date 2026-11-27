@@ -1,12 +1,42 @@
 "use client";
 
-import { useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Popover } from "@/components/ui/Popover";
 import { BottomSheet } from "@/components/ui/BottomSheet";
 import { Chip } from "@/components/ui/Chip";
 import { Button } from "@/components/ui/Button";
 import { isMobileSheetViewport } from "@/lib/mobileViewport";
 import { cn } from "@/lib/cn";
+
+/**
+ * A short window (a phone on its side) still matches Tailwind `sm`, so the
+ * price fields would be `sm:text-sm` / `sm:h-9` and the bedroom buttons and
+ * checkbox rows would drop their `max-sm:` 44px targets. These overrides sit
+ * on an ancestor, which beats the single-class utilities on the controls.
+ * Keep the 500px cutoff in sync with `SHEET_MAX_HEIGHT_PX`.
+ */
+const SHORT_VIEWPORT_TARGETS = [
+  "[@media(max-height:500px)]:[&_input[type=text]]:text-base",
+  "[@media(max-height:500px)]:[&_input[type=text]]:h-11",
+  "[@media(max-height:500px)]:[&_button]:min-h-11",
+  "[@media(max-height:500px)]:[&_label]:min-h-11"
+].join(" ");
+
+function triggerButton(trigger: HTMLElement | null): HTMLButtonElement | null {
+  return trigger?.querySelector<HTMLButtonElement>("button") ?? null;
+}
+
+/** Focus goes back to the chip when the dialog itself had it (Escape, Done,
+ * the scrim). A press that has already moved focus onto another control must
+ * keep that focus — moving it back scrolls the chip row and can swallow the
+ * click that was about to open the next menu. */
+function shouldRestoreFocus(active: Element | null, trigger: HTMLElement | null): boolean {
+  if (!active || active === document.body || active === document.documentElement) return true;
+  if (trigger?.contains(active)) return true;
+  if (active.closest("[role='dialog']")) return true;
+  if (active.getAttribute("aria-label") === "Dismiss") return true;
+  return false;
+}
 
 type FilterMenuProps = {
   /** Chip contents — usually the active filter's value, or the dimension name. */
@@ -27,9 +57,11 @@ type FilterMenuProps = {
 
 /**
  * The one filter-menu abstraction: a Chip trigger plus either an anchored
- * Popover (wide viewports) or a bottom sheet (below the `sm` breakpoint).
+ * Popover (wide, tall viewports) or a bottom sheet (a narrow phone, or a
+ * short one — see `MOBILE_SHEET_MEDIA`).
  * Both share a heading, a scrolling body, and a Clear/Done footer. Manages
- * its own open/close and returns focus to the trigger on close.
+ * its own open/close. Escape, Done, and the scrim return focus to the
+ * trigger; a press or tab that already moved focus somewhere else keeps it.
  *
  * On desktop, single-open-at-a-time falls out for free — opening another menu
  * is an outside-mousedown that dismisses this one — so the bar needs no
@@ -52,11 +84,52 @@ export function FilterMenu({
   const [sheet, setSheet] = useState(false);
   const triggerRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
+  // Set in the capture phase of mousedown, before the popover's bubble
+  // listener calls `close`. Chrome focuses the pressed control *after*
+  // mousedown listeners return, so `document.activeElement` is still inside
+  // this dialog and a synchronous focus() on our chip scrolls the row.
+  const pointerTargetRef = useRef<Element | null>(null);
 
   const close = () => {
+    const trigger = triggerRef.current;
+    const pointed = pointerTargetRef.current;
+    pointerTargetRef.current = null;
+    const active = document.activeElement instanceof Element ? document.activeElement : null;
+    const pointedElsewhere =
+      pointed !== null &&
+      !trigger?.contains(pointed) &&
+      !pointed.closest("[role='dialog']") &&
+      pointed.getAttribute("aria-label") !== "Dismiss";
     setOpen(false);
-    triggerRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    if (!pointedElsewhere && shouldRestoreFocus(active, trigger)) {
+      triggerButton(trigger)?.focus();
+    }
   };
+
+  // The desktop popover is not modal: the page stays interactive, and Tab is
+  // how a keyboard user reaches the next chip. Leaving the dialog open covers
+  // that chip. Close when focus lands outside, and do not pull it back.
+  useEffect(() => {
+    if (!open || sheet) return;
+    const onMouseDown = (event: MouseEvent) => {
+      pointerTargetRef.current = event.target instanceof Element ? event.target : null;
+    };
+    const onFocusIn = (event: FocusEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (target === document.body || target === document.documentElement) return;
+      const trigger = triggerRef.current;
+      if (trigger?.contains(target)) return;
+      if (target.closest("[role='dialog']")) return;
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", onMouseDown, true);
+    document.addEventListener("focusin", onFocusIn);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown, true);
+      document.removeEventListener("focusin", onFocusIn);
+    };
+  }, [open, sheet]);
 
   const toggle = () => {
     if (open) {
@@ -78,7 +151,15 @@ export function FilterMenu({
           {title}
         </h2>
       </div>
-      <div className={cn("min-h-0 flex-1 overflow-y-auto p-4", sheet && "overscroll-contain")}>{children}</div>
+      <div
+        className={cn(
+          "min-h-0 flex-1 overflow-y-auto p-4",
+          sheet && "overscroll-contain",
+          sheet && SHORT_VIEWPORT_TARGETS
+        )}
+      >
+        {children}
+      </div>
       <div className="flex items-center justify-between border-t border-border px-4 py-3">
         {onClear ? (
           <Button variant="link" className={footerButton} onClick={onClear}>
