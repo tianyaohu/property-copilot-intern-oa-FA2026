@@ -6,6 +6,7 @@ import {
 import { beforeAll, describe, expect, it } from "vitest";
 import { putProperty } from "../backend/src/properties";
 import { route } from "../backend/src/router";
+import { propertiesTableCreateInput } from "../backend/src/table-schema";
 import type { Property } from "../backend/src/types";
 
 // Integration tests for the /properties viewport query, run against DynamoDB
@@ -29,29 +30,6 @@ const admin = new DynamoDBClient({
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? "local"
   }
 });
-
-// Mirrors the schema in backend/scripts/create-local-table.ts / infra. Inlined
-// because that script executes on import.
-const TABLE_SCHEMA = {
-  TableName: TABLE_NAME,
-  BillingMode: "PAY_PER_REQUEST" as const,
-  AttributeDefinitions: [
-    { AttributeName: "id", AttributeType: "S" as const },
-    { AttributeName: "geohashPrefix", AttributeType: "S" as const },
-    { AttributeName: "geohash", AttributeType: "S" as const }
-  ],
-  KeySchema: [{ AttributeName: "id", KeyType: "HASH" as const }],
-  GlobalSecondaryIndexes: [
-    {
-      IndexName: "geo-index",
-      KeySchema: [
-        { AttributeName: "geohashPrefix", KeyType: "HASH" as const },
-        { AttributeName: "geohash", KeyType: "RANGE" as const }
-      ],
-      Projection: { ProjectionType: "ALL" as const }
-    }
-  ]
-};
 
 type SeedListing = Omit<Property, "geohash" | "geohashPrefix">;
 
@@ -114,7 +92,7 @@ describe.runIf(!!ENDPOINT)("GET /properties (integration, DynamoDB Local)", () =
     } catch {
       // Table did not exist yet.
     }
-    await admin.send(new CreateTableCommand(TABLE_SCHEMA));
+    await admin.send(new CreateTableCommand(propertiesTableCreateInput(TABLE_NAME)));
     for (const fixture of FIXTURES) {
       await putProperty(fixture);
     }
