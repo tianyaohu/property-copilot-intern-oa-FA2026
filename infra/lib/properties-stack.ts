@@ -6,6 +6,35 @@ import * as lambdaNode from "aws-cdk-lib/aws-lambda-nodejs";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as apigwv2 from "aws-cdk-lib/aws-apigatewayv2";
 import * as integrations from "aws-cdk-lib/aws-apigatewayv2-integrations";
+import propertiesTable from "../../backend/src/properties-table.json";
+
+// The JSON file is the spec. These checks are the CDK type-system edge:
+// a new attribute code, billing mode, or projection fails synth until this
+// stack maps it. ts-node cannot import backend/src/table-schema.ts (that
+// module lives in the ESM package), so the stack reads the JSON itself.
+function keyAttribute(attribute: { name: string; type: string }): {
+  name: string;
+  type: dynamodb.AttributeType;
+} {
+  if (attribute.type !== "S") {
+    throw new Error(`Unsupported DynamoDB attribute type "${attribute.type}"`);
+  }
+  return { name: attribute.name, type: dynamodb.AttributeType.STRING };
+}
+
+function billingMode(mode: string): dynamodb.BillingMode {
+  if (mode !== "PAY_PER_REQUEST") {
+    throw new Error(`Unsupported billing mode "${mode}"`);
+  }
+  return dynamodb.BillingMode.PAY_PER_REQUEST;
+}
+
+function projectionType(projection: string): dynamodb.ProjectionType {
+  if (projection !== "ALL") {
+    throw new Error(`Unsupported projection "${projection}"`);
+  }
+  return dynamodb.ProjectionType.ALL;
+}
 
 /**
  * Provisions the AWS backend for the property browser:
@@ -17,24 +46,25 @@ export class PropertiesStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const tableName = "Properties";
-
     const table = new dynamodb.Table(this, "PropertiesTable", {
-      tableName,
-      partitionKey: { name: "id", type: dynamodb.AttributeType.STRING },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      tableName: propertiesTable.defaultTableName,
+      partitionKey: keyAttribute(propertiesTable.partitionKey),
+      billingMode: billingMode(propertiesTable.billingMode),
       // Free-tier friendly and fine for an OA. Tears down cleanly.
+      // Not part of the shared table spec: local DynamoDB has no removal policy.
       removalPolicy: cdk.RemovalPolicy.DESTROY
     });
 
-    // Geospatial GSI: partition by coarse geohash prefix, sort by full geohash.
-    // A bounding-box query hits only the prefixes that overlap the viewport.
-    table.addGlobalSecondaryIndex({
-      indexName: "geo-index",
-      partitionKey: { name: "geohashPrefix", type: dynamodb.AttributeType.STRING },
-      sortKey: { name: "geohash", type: dynamodb.AttributeType.STRING },
-      projectionType: dynamodb.ProjectionType.ALL
-    });
+    // Geospatial GSIs from the shared spec. A bounding-box query hits only
+    // the prefixes that overlap the viewport.
+    for (const index of propertiesTable.globalSecondaryIndexes) {
+      table.addGlobalSecondaryIndex({
+        indexName: index.indexName,
+        partitionKey: keyAttribute(index.partitionKey),
+        sortKey: keyAttribute(index.sortKey),
+        projectionType: projectionType(index.projection)
+      });
+    }
 
     // The repo root holds the shared backend source and the lockfile esbuild
     // uses to resolve dependencies (ngeohash). The Lambda entry must live under

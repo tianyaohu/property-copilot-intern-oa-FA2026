@@ -1,19 +1,21 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { DEFAULT_TABLE_NAME, GEO_INDEX_NAME } from "./table-schema";
 
 /**
  * DynamoDB table name at call time. The seed script and local server load
  * `.env` after this module is imported, and `npm run db:local` reads
  * PROPERTIES_TABLE after that load. Reading the name on each request keeps
  * writes, viewport queries, and the created table on the configured name.
- * Lambda sets the variable before the process loads this module.
+ * Lambda sets the variable before the process loads this module. The fallback
+ * is the name the CDK stack provisions.
  */
 export function tableName(): string {
-  return process.env.PROPERTIES_TABLE ?? "Properties";
+  return process.env.PROPERTIES_TABLE ?? DEFAULT_TABLE_NAME;
 }
 
-/** Name of the geospatial GSI defined in the CDK stack (infra/lib/properties-stack.ts). */
-export const GEO_INDEX = "geo-index";
+/** Geospatial GSI name from the table spec. Queries send it as `IndexName`. */
+export const GEO_INDEX = GEO_INDEX_NAME;
 
 let docClient: DynamoDBDocumentClient | undefined;
 

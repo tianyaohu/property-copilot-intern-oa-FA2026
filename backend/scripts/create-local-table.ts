@@ -4,14 +4,16 @@ import {
   DescribeTableCommand
 } from "@aws-sdk/client-dynamodb";
 import nextEnv from "@next/env";
+import { tableName } from "../src/db";
+import { GEO_INDEX_NAME, propertiesTableCreateInput } from "../src/table-schema";
 
 // Creates the Properties table (and geo GSI) in DynamoDB Local for development.
-// The real table is created by the CDK stack (infra/) in your AWS account; this
-// script mirrors that schema so local dev matches production.
+// The real table is created by the CDK stack (infra/) in your AWS account.
+// Both use backend/src/table-schema.ts, so the keys cannot drift.
 
 nextEnv.loadEnvConfig(process.cwd());
 
-const TABLE_NAME = process.env.PROPERTIES_TABLE ?? "Properties";
+const TABLE_NAME = tableName();
 const ENDPOINT = process.env.DYNAMODB_ENDPOINT ?? "http://localhost:8000";
 
 const client = new DynamoDBClient({
@@ -32,30 +34,9 @@ async function main() {
     // Table does not exist yet; create it below.
   }
 
-  await client.send(
-    new CreateTableCommand({
-      TableName: TABLE_NAME,
-      BillingMode: "PAY_PER_REQUEST",
-      AttributeDefinitions: [
-        { AttributeName: "id", AttributeType: "S" },
-        { AttributeName: "geohashPrefix", AttributeType: "S" },
-        { AttributeName: "geohash", AttributeType: "S" }
-      ],
-      KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
-      GlobalSecondaryIndexes: [
-        {
-          IndexName: "geo-index",
-          KeySchema: [
-            { AttributeName: "geohashPrefix", KeyType: "HASH" },
-            { AttributeName: "geohash", KeyType: "RANGE" }
-          ],
-          Projection: { ProjectionType: "ALL" }
-        }
-      ]
-    })
-  );
+  await client.send(new CreateTableCommand(propertiesTableCreateInput(TABLE_NAME)));
 
-  console.log(`Created table "${TABLE_NAME}" with geo-index at ${ENDPOINT}.`);
+  console.log(`Created table "${TABLE_NAME}" with ${GEO_INDEX_NAME} at ${ENDPOINT}.`);
 }
 
 main().catch((error) => {
