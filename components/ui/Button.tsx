@@ -12,7 +12,7 @@ type ButtonProps = {
 } & ButtonHTMLAttributes<HTMLButtonElement>;
 
 const base =
-  "inline-flex items-center justify-center gap-1.5 font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed";
+  "inline-flex items-center justify-center gap-1.5 font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed max-sm:min-h-11 max-sm:min-w-11";
 
 const variants: Record<Variant, string> = {
   primary: "rounded-md bg-accent text-accent-fg hover:bg-accent/90 disabled:bg-border disabled:text-muted",
@@ -27,7 +27,9 @@ const sizes: Record<Size, string> = {
 
 /** The one primary/secondary/text button in the app. Replaces the black-button
  * and underlined "Clear" class strings that were duplicated across the filter
- * surfaces. `type` defaults to "button" so it never accidentally submits. */
+ * surfaces. `type` defaults to "button" so it never accidentally submits.
+ * `h-8` / `h-9` are the desktop sizes; below `sm` every variant is at least
+ * 44×44 so a phone can hit Clear, Done, and "Try again". */
 export function Button({ variant = "primary", size = "md", type = "button", className, ...props }: ButtonProps) {
   return (
     <button
